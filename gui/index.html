@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Charter</title>
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="./index.css" type="text/css" media="screen" charset="utf-8">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+    <div class="titleHolder">
+        <div class="title">
+            <h1>Charter Prototype</h1>
+        </div>
+    </div>
+    <!--<span id="tester"></span>-->
+    <!--<h2>Using Zeromq</h2>-->
+    <div class="container buttonsHolder">
+        <div class="row align-items-center">
+            <div class="col-sm">
+                <button id="startButton" type="button" class="btn btn-primary">Start</button>
+            </div>
+            <div class="col-sm">
+                <button id="saveButton" type="button" class="btn btn-success">Save</button>
+            </div>
+            <div class="col-sm">
+                <button id="stopButton" type="button" class="btn btn-danger">Stop</button>
+            </div>
+            <div class="col-sm">
+                <button id="clearButton" type="button" class="btn btn-warning">Clear</button>
+            </div>
+        </div>
+    </div>
+    <div class="chartHolder">
+        <div id="chart-2"></div>
+    </div>
+    <!--<h2>Using python-shell</h2>-->
+    <!--<div id="chart-wrapper">-->
+    <!--<div id="chart-1"></div>-->
+    <!--</div>-->
+
+    <script>
+        // You can also require other files to run in this process
+        // require('./renderer.js')
+        require('./linkers/lmain.js');
+    </script>
+</body>
+
+</html>

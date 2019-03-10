@@ -1,0 +1,3 @@
+styles = {
+    'startBtn': 3
+}
