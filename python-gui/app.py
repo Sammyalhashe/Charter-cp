@@ -9,17 +9,13 @@ from pyqtgraph.Qt import QtGui
 import zerorpc
 import numpy as np
 from data import dataRPC
+from styles import styles
 
 # import threading
 
 ###############################################################################
 
-mapping = {
-    'button': QPushButton,
-    'dropdown': QComboBox,
-    'text': QLineEdit,
-    'plot': pg.PlotWidget
-}
+mapping = {'button': QPushButton, 'dropdown': QComboBox, 'text': QLineEdit, 'plot': pg.PlotWidget}
 
 ###############################################################################
 
@@ -80,18 +76,13 @@ class Plotter(QWidget):
         if widget == 'plot':
             return mapping[widget]()
         else:
-            instance = mapping[widget](
-                kwargs.get('text', widget),
-                objectName=kwargs.get('name', widget))
+            instance = mapping[widget](kwargs.get('text', widget), objectName=kwargs.get('name', widget))
             instance.setStyleSheet("""
                                    {0}#{1} {{
                                     background-color: {2};
                                     color: {3};
                                    }}
-                                   """.format(
-                mapping[widget].__name__, kwargs.get('name', widget),
-                kwargs.get('backColor', 'transparent'),
-                kwargs.get('color', 'black')))
+                                   """.format(mapping[widget].__name__, kwargs.get('name', widget), kwargs.get('backColor', 'transparent'), kwargs.get('color', 'black')))
             return instance
 
     def messageBox(self, message):
@@ -112,25 +103,13 @@ class Plotter(QWidget):
         self.btn = QPushButton("Start", self)
         self.stop = QPushButton("Stop", self)
         # self.clear = QPushButton("Clear Plot", self)
-        self.clear = self.widgetCreator(
-            'button',
-            text='Clear',
-            name='clearButton',
-            backColor='green',
-            color='red')
-        self.save = self.widgetCreator(
-            'button',
-            text='Save',
-            name='saveButton',
-            backColor='teal',
-            color='orange')
+        self.clear = self.widgetCreator('button', text='Clear', name='clearButton', backColor='green', color='red')
+        self.save = self.widgetCreator('button', text='Save', name='saveButton', backColor='teal', color='orange')
         self.Xtext = QLineEdit("Label for x-axis", self)
         self.Ytext = QLineEdit("Label for y-axis", self)
 
-        self.btn.setStyleSheet(
-            'QPushButton {background-color: #A3C1DA; color: blue;}')
-        self.stop.setStyleSheet(
-            'QPushButton {background-color: #A3C1DA; color: red;}')
+        self.btn.setStyleSheet('QPushButton {background-color: #A3C1DA; color: blue;}')
+        self.stop.setStyleSheet('QPushButton {background-color: #A3C1DA; color: red;}')
 
         # combobox init
         self.YcomboBox = QComboBox(self)
@@ -147,6 +126,10 @@ class Plotter(QWidget):
         self.stop.clicked.connect(lambda _: self.stopData())
         self.clear.clicked.connect(lambda _: self.clearData())
         self.save.clicked.connect(lambda _: self.saveData())
+        self.Xtext.textEdited.connect(self.setTitle)
+        self.Ytext.textEdited.connect(self.setTitle)
+        self.Xtext.textEdited.connect(self.setXLabel)
+        self.Ytext.textEdited.connect(self.setYLabel)
 
         # pyqt graph init
         self.plotWidget = pg.PlotWidget()
@@ -179,9 +162,12 @@ class Plotter(QWidget):
 
         # application showing
         self.setLayout(self.vbox)
-        self.setGeometry(300, 300, 768, 768)
+        self.setGeometry(300, 300, 1468, 1468)
         self.windowWidth = 768
         self.setWindowTitle("Plotter")
+        self.setTitle()
+        self.setXLabel()
+        self.setYLabel()
         self.show()
 
     def initComboBox(self, box):
@@ -192,6 +178,29 @@ class Plotter(QWidget):
         items = ["channel {}".format(i + 1) for i in range(4)]
         for name in items:
             box.addItem(name)
+
+    def setTitle(self):
+        xtext = self.Xtext.text()
+        ytext = self.Ytext.text()
+        self.plotWidget.setTitle("""
+                                 <h1>{0} vs {1}</h1>
+                                 """.format(ytext, xtext))
+
+    def setXLabel(self):
+        xtext = self.Xtext.text()
+        html = """
+            <style>{0}</style>
+            <i class='label'>{1}</i>
+        """.format(styles['label'], xtext)
+        self.plotWidget.setLabel('bottom', text=html)
+
+    def setYLabel(self):
+        ytext = self.Ytext.text()
+        html = """
+            <style>{0}</style>
+            <i class='label'>{1}</i>
+        """.format(styles['label'], ytext)
+        self.plotWidget.setLabel('left', text=html)
 
     def getObserver(self):
         """getObserver"""
@@ -211,8 +220,7 @@ class Plotter(QWidget):
         if not self.observer:
             self.getObserver()
         if not self.subscription:
-            self.subscription = self.observer.subscribe_(
-                lambda x: self.addData(x))
+            self.subscription = self.observer.subscribe_(lambda x: self.addData(x))
         self.data_rpc.getData_test(on=True)
 
     def addData(self, newData):
@@ -223,6 +231,7 @@ class Plotter(QWidget):
         # to make the plot as a while move left
         # might take this out
         # self.ww -= 1
+        print(self.currentlyPlotting)
         fixedNewData = np.array([[i] for i in newData])
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
@@ -232,8 +241,7 @@ class Plotter(QWidget):
         # self.data = np.append(self.data, newData[0])
         if self.data[0].size == 1:
             for i in range(len(self.data)):
-                plot = self.plotWidget.plot(
-                    self.data[i], pen=(i, self.data.size))
+                plot = self.plotWidget.plot(self.data[i], pen=(i, self.data.size))
                 self.traces.append(plot)
         else:
             for i in range(len(self.data)):
@@ -257,6 +265,7 @@ class Plotter(QWidget):
             self.subscription.dispose()
             self.subscription = None
             self.data_rpc.toggleListening(on=self.currentlyPlotting)
+            QtGui.QApplication.processEvents()
 
     def resumeData(self):
         if not self.subscription:
