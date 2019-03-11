@@ -6,16 +6,20 @@ from PyQt5.QtCore import QRect  # pyqtSlot
 import pyqtgraph as pg
 import pyqtgraph.exporters as pg_e
 from pyqtgraph.Qt import QtGui
-import zerorpc
 import numpy as np
-from data import dataRPC
 from styles import styles
+from data import dataRPC
 
 # import threading
-
+# import zerorpc
 ###############################################################################
 
-mapping = {'button': QPushButton, 'dropdown': QComboBox, 'text': QLineEdit, 'plot': pg.PlotWidget}
+mapping = {
+    'button': QPushButton,
+    'dropdown': QComboBox,
+    'text': QLineEdit,
+    'plot': pg.PlotWidget
+}
 
 ###############################################################################
 
@@ -25,24 +29,24 @@ class thread_runner(object):
 
     def __init__(self):
         """__init__"""
-        self.data_rpc = dataRPC()
+        # self.data_rpc = dataRPC()
         # self.thread = threading.Thread(target=self.init_daemon, args=())
         # self.thread.daemon = True
         # self.thread.start()
 
     def get_rpc(self):
         """get_rpc"""
-        if not self.data_rpc:
-            self.data_rpc = dataRPC()
+        # if not self.data_rpc:
+        # self.data_rpc = dataRPC()
 
     def init_daemon(self):
         """init_daemon"""
-        if not self.data_rpc:
-            self.get_rpc()
-        s = zerorpc.Server(self.data_rpc)
-        s.bind("tcp://0.0.0.0:4242")
-        s.run()
-        sys.stdout.flush()
+        # if not self.data_rpc:
+        # self.get_rpc()
+        # s = zerorpc.Server(self.data_rpc)
+        # s.bind("tcp://0.0.0.0:4242")
+        # s.run()
+        # sys.stdout.flush()
 
 
 ###############################################################################
@@ -76,13 +80,18 @@ class Plotter(QWidget):
         if widget == 'plot':
             return mapping[widget]()
         else:
-            instance = mapping[widget](kwargs.get('text', widget), objectName=kwargs.get('name', widget))
+            instance = mapping[widget](
+                kwargs.get('text', widget),
+                objectName=kwargs.get('name', widget))
             instance.setStyleSheet("""
                                    {0}#{1} {{
                                     background-color: {2};
                                     color: {3};
                                    }}
-                                   """.format(mapping[widget].__name__, kwargs.get('name', widget), kwargs.get('backColor', 'transparent'), kwargs.get('color', 'black')))
+                                   """.format(
+                mapping[widget].__name__, kwargs.get('name', widget),
+                kwargs.get('backColor', 'transparent'),
+                kwargs.get('color', 'black')))
             return instance
 
     def messageBox(self, message):
@@ -103,13 +112,25 @@ class Plotter(QWidget):
         self.btn = QPushButton("Start", self)
         self.stop = QPushButton("Stop", self)
         # self.clear = QPushButton("Clear Plot", self)
-        self.clear = self.widgetCreator('button', text='Clear', name='clearButton', backColor='green', color='red')
-        self.save = self.widgetCreator('button', text='Save', name='saveButton', backColor='teal', color='orange')
+        self.clear = self.widgetCreator(
+            'button',
+            text='Clear',
+            name='clearButton',
+            backColor='green',
+            color='red')
+        self.save = self.widgetCreator(
+            'button',
+            text='Save',
+            name='saveButton',
+            backColor='teal',
+            color='orange')
         self.Xtext = QLineEdit("Label for x-axis", self)
         self.Ytext = QLineEdit("Label for y-axis", self)
 
-        self.btn.setStyleSheet('QPushButton {background-color: #A3C1DA; color: blue;}')
-        self.stop.setStyleSheet('QPushButton {background-color: #A3C1DA; color: red;}')
+        self.btn.setStyleSheet(
+            'QPushButton {background-color: #A3C1DA; color: blue;}')
+        self.stop.setStyleSheet(
+            'QPushButton {background-color: #A3C1DA; color: red;}')
 
         # combobox init
         self.YcomboBox = QComboBox(self)
@@ -133,6 +154,7 @@ class Plotter(QWidget):
 
         # pyqt graph init
         self.plotWidget = pg.PlotWidget()
+        self.plotWidget.addLegend()
 
         # layout init
         self.vbox = QVBoxLayout()
@@ -220,7 +242,8 @@ class Plotter(QWidget):
         if not self.observer:
             self.getObserver()
         if not self.subscription:
-            self.subscription = self.observer.subscribe_(lambda x: self.addData(x))
+            self.subscription = self.observer.subscribe_(
+                lambda x: self.addData(x))
         self.data_rpc.getData_test(on=True)
 
     def addData(self, newData):
@@ -231,7 +254,6 @@ class Plotter(QWidget):
         # to make the plot as a while move left
         # might take this out
         # self.ww -= 1
-        print(self.currentlyPlotting)
         fixedNewData = np.array([[i] for i in newData])
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
@@ -241,12 +263,12 @@ class Plotter(QWidget):
         # self.data = np.append(self.data, newData[0])
         if self.data[0].size == 1:
             for i in range(len(self.data)):
-                plot = self.plotWidget.plot(self.data[i], pen=(i, self.data.size))
+                plot = self.plotWidget.plot(
+                    self.data[i], pen=(i, self.data.size), name=i)
                 self.traces.append(plot)
         else:
             for i in range(len(self.data)):
                 self.traces[i].setData(self.data[i])
-            print(self.traces)
             # this is what repositions the plot
             # self.plot.setPos(self.ww, 0)
             QtGui.QApplication.processEvents()
