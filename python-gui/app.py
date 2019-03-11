@@ -154,7 +154,6 @@ class Plotter(QWidget):
 
         # pyqt graph init
         self.plotWidget = pg.PlotWidget()
-        self.plotWidget.addLegend()
 
         # layout init
         self.vbox = QVBoxLayout()
@@ -237,6 +236,7 @@ class Plotter(QWidget):
             return
         if self.data is not None and self.data.size != 0:
             self.clearData()
+        self.legend = self.plotWidget.addLegend()
         self.currentlyPlotting = True
         self.ww = 0
         if not self.observer:
@@ -264,7 +264,7 @@ class Plotter(QWidget):
         if self.data[0].size == 1:
             for i in range(len(self.data)):
                 plot = self.plotWidget.plot(
-                    self.data[i], pen=(i, self.data.size), name=i)
+                    self.data[i], pen=(i, self.data.size) ) # name=i
                 self.traces.append(plot)
         else:
             for i in range(len(self.data)):
@@ -308,6 +308,7 @@ class Plotter(QWidget):
         if self.data.size == 0:
             print("No data has been plotted")
         else:
+            self.legend.scene().removeItem(self.legend)
             for i in range(len(self.data)):
                 print(self.traces[i])
                 self.traces[i].clear()
