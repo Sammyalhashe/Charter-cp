@@ -124,8 +124,19 @@ class Plotter(QWidget):
             name='saveButton',
             backColor='teal',
             color='orange')
+
+        self.windowRange = 10.  #### CHANGED_HERE default window of 10
+        self.Y_lower = None # CHANGED_HERE user-set y-axis lower limit
+        self.Y_upper = None # CHANGED_HERE user-set y-axis upper limit
+        self.X_autoscale = False; # CHANGED_HERE boolean to switch on and off Y-autoscaling
+
         self.Xtext = QLineEdit("Label for x-axis", self)
         self.Ytext = QLineEdit("Label for y-axis", self)
+        self.Y_lower_text = QLineEdit("Lower Limit for y-axis", self) # CHANGED_HERE QLine for lower limit of Y-axis
+        self.Y_upper_text = QLineEdit("Upper Limit for y-axis", self) # CHANGED_HERE QLine for upper limit of Y-axis
+        self.windowRange_text = QLineEdit("Window Range", self) # CHANGED_HERE QLine for window range. allow dude to change window size from gui. TODO: fit it nicely somewhere into gui.
+        self.autoscale_Y = QPushButton("AutoY", self) # CHANGED_HERE turn on and off autoscaling of Y axis
+        self.autoscale_X = QPushButton("AutoX", self) # CHANGED_HERE turn on and off autoscaling of X axis
 
         self.btn.setStyleSheet(
             'QPushButton {background-color: #A3C1DA; color: blue;}')
@@ -151,6 +162,11 @@ class Plotter(QWidget):
         self.Ytext.textEdited.connect(self.setTitle)
         self.Xtext.textEdited.connect(self.setXLabel)
         self.Ytext.textEdited.connect(self.setYLabel)
+        self.Y_lower_text.textEdited.connect(self.setYRange) # CHANGED_HERE
+        self.Y_upper_text.textEdited.connect(self.setYRange) # CHANGED_HERE
+        self.autoscale_X.clicked.connect(lambda _: self.setAutoscale(0)) # CHANGED_HERE, TODO should we change this to a toggle?
+        self.autoscale_Y.clicked.connect(lambda _: self.setAutoscale(1)) # CHANGED_HERE, TODO should we change this to a toggle?
+        self.windowRange_text.textEdited.connect(self.setWindowRange) # CHANGED_HERE connects Qline to function call
 
         # pyqt graph init
         self.plotWidget = pg.PlotWidget()
@@ -169,6 +185,11 @@ class Plotter(QWidget):
         self.grid_layout.addWidget(self.Xtext, 1, 1)
         self.grid_layout.addWidget(self.clear, 1, 2)
         self.grid_layout.addWidget(self.save, 1, 3)
+        self.grid_layout.addWidget(self.Y_lower_text, 2, 0)
+        self.grid_layout.addWidget(self.Y_upper_text, 2, 1)
+        self.grid_layout.addWidget(self.windowRange_text, 3, 0) # put it somewhere proper. temporary position
+        self.grid_layout.addWidget(self.autoscale_Y, 2, 2)
+        self.grid_layout.addWidget(self.autoscale_X, 2, 3)
 
         self.vbox.addLayout(self.grid_layout)
         self.vbox.addWidget(self.plotWidget)
@@ -189,7 +210,30 @@ class Plotter(QWidget):
         self.setTitle()
         self.setXLabel()
         self.setYLabel()
+        self.plotWidget.setXRange(0,self.windowRange) # CHANGED_HERE : initial window from 0 to XRange.
         self.show()
+
+    def setYRange(self):
+        try:
+            self.Y_lower = float(self.Y_lower_text.text())
+            self.Y_upper = float(self.Y_upper_text.text())
+            self.plotWidget.setYRange(self.Y_lower, self.Y_upper)
+        except:
+            self.Y_lower = None
+            self.Y_upper = None
+
+    def setWindowRange(self): ## CHANGED_HERE : function to connect to GUI. allows user to change window size
+        try:
+            self.windowRange = float(self.windowRange_text.text()) # CHANGED_HERE: retrieves value from user box. TODO: proof against invalid values eg. letters
+            print(self.windowRange)
+            self.plotWidget.setXRange(0, self.windowRange)
+            self.X_autoscale = False
+        except:
+            pass
+
+    def setAutoscale(self, axis):
+        self.plotWidget.enableAutoRange(axis=axis)
+        self.X_autoscale = True if axis==0 else self.X_autoscale
 
     def initComboBox(self, box):
         """initComboBox
@@ -242,7 +286,7 @@ class Plotter(QWidget):
         if not self.observer:
             self.getObserver()
         if not self.subscription:
-            self.subscription = self.observer.subscribe_(
+            self.subscription = self.observer.subscribe(
                 lambda x: self.addData(x))
         self.data_rpc.getData_test(on=True)
 
@@ -254,24 +298,41 @@ class Plotter(QWidget):
         # to make the plot as a while move left
         # might take this out
         # self.ww -= 1
-        fixedNewData = np.array([[i] for i in newData])
+        #print(self.data.shape)
+        #print(len(self.data))
+        fixedNewData = np.array([[i] for i in newData]) # this part is to add new datapoints to self.data
+                                                        # note: self.data is numpy ndarray
+                                                        #       self.traces is a plotItem wrapper around the datapoints
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
             self.data += fixedNewData
         else:
             self.data = np.concatenate((self.data, fixedNewData), axis=1)
         # self.data = np.append(self.data, newData[0])
-        if self.data[0].size == 1:
-            for i in range(len(self.data)):
-                plot = self.plotWidget.plot(
-                    self.data[i], pen=(i, self.data.size) ) # name=i
-                self.traces.append(plot)
+        if self.data.shape[1] == 1: # if there's only one datapoint
+            for i in range(self.data.shape[0]): # then for both channels
+                plot = self.plotWidget.plot(    # wrap it up as a PlotDataItem
+                    self.data[i], pen=(i, self.data.size) ) # name=i #find out from sammy wtf is pen
+                self.traces.append(plot)       # keep a running list of PlotDataItems
+                                               # should look into memory usage for long plots
+        # if self.data.shape[1] > self.windowRange: # CHANGED_HERE: continually change axis range NOTE: FAILED
+        #     left = self.data.shape[1]-self.windowRange
+        #     right = self.data.shape[1]-1
+        #     print(left,right)
+        #     self.plotWidget.setXRange(left, right) 
         else:
-            for i in range(len(self.data)):
-                self.traces[i].setData(self.data[i])
+            for i in range(len(self.data)):    # else, traces has been init
+                self.traces[i].setData(self.data[i]) # then, just set data accordingly
+                if (self.data.shape[1] < self.windowRange or self.X_autoscale): #CHANGED_HERE: aligns plotItem to left if it still fits within window
+                    self.traces[i].setPos(0,0) 
+                else : # CHANGED_HERE. else, we just clip the plotItem accordingly
+                    self.traces[i].setPos(-self.data.shape[1]+self.windowRange+1,0) # CHANGED_HERE setPos of each plotItem
             # this is what repositions the plot
             # self.plot.setPos(self.ww, 0)
             QtGui.QApplication.processEvents()
+
+    #def addData(self,newData):
+
 
     def stopData(self):
         """stopData
