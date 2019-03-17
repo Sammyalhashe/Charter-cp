@@ -128,7 +128,7 @@ class Plotter(QWidget):
         self.windowRange = 10.  #### CHANGED_HERE default window of 10
         self.Y_lower = None # CHANGED_HERE user-set y-axis lower limit
         self.Y_upper = None # CHANGED_HERE user-set y-axis upper limit
-        self.Y_autoscale = True; # CHANGED_HERE boolean to switch on and off Y-autoscaling
+        self.X_autoscale = False; # CHANGED_HERE boolean to switch on and off Y-autoscaling
 
         self.Xtext = QLineEdit("Label for x-axis", self)
         self.Ytext = QLineEdit("Label for y-axis", self)
@@ -227,11 +227,13 @@ class Plotter(QWidget):
             self.windowRange = float(self.windowRange_text.text()) # CHANGED_HERE: retrieves value from user box. TODO: proof against invalid values eg. letters
             print(self.windowRange)
             self.plotWidget.setXRange(0, self.windowRange)
+            self.X_autoscale = False
         except:
             pass
 
     def setAutoscale(self, axis):
         self.plotWidget.enableAutoRange(axis=axis)
+        self.X_autoscale = True if axis==0 else self.X_autoscale
 
     def initComboBox(self, box):
         """initComboBox
@@ -321,11 +323,10 @@ class Plotter(QWidget):
         else:
             for i in range(len(self.data)):    # else, traces has been init
                 self.traces[i].setData(self.data[i]) # then, just set data accordingly
-                if (self.data.shape[1] < self.windowRange): #CHANGED_HERE: aligns plotItem to left if it still fits within window
+                if (self.data.shape[1] < self.windowRange or self.X_autoscale): #CHANGED_HERE: aligns plotItem to left if it still fits within window
                     self.traces[i].setPos(0,0) 
                 else : # CHANGED_HERE. else, we just clip the plotItem accordingly
                     self.traces[i].setPos(-self.data.shape[1]+self.windowRange+1,0) # CHANGED_HERE setPos of each plotItem
-                print(type(self.traces[i]))
             # this is what repositions the plot
             # self.plot.setPos(self.ww, 0)
             QtGui.QApplication.processEvents()
