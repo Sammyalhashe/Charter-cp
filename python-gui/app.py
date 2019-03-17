@@ -313,13 +313,8 @@ class Plotter(QWidget):
             for i in range(self.data.shape[0]): # then for both channels
                 plot = self.plotWidget.plot(    # wrap it up as a PlotDataItem
                     self.data[i], pen=(i, self.data.size) ) # name=i #find out from sammy wtf is pen
-                self.traces.append(plot)       # keep a running list of PlotDataItems
+                self.traces.append(plot)       # initialize list of PlotItems
                                                # should look into memory usage for long plots
-        # if self.data.shape[1] > self.windowRange: # CHANGED_HERE: continually change axis range NOTE: FAILED
-        #     left = self.data.shape[1]-self.windowRange
-        #     right = self.data.shape[1]-1
-        #     print(left,right)
-        #     self.plotWidget.setXRange(left, right) 
         else:
             for i in range(len(self.data)):    # else, traces has been init
                 self.traces[i].setData(self.data[i]) # then, just set data accordingly
