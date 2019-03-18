@@ -34,7 +34,7 @@ class dataRPC():
         if not self.stream:
             self.activateStream()
         channels = channels.split(' ')
-        self.stream.on_next([sin(random()) for i in channels])
+        self.stream.on_next([[sin(random())]*10 for i in channels])
 
     def getData_test(self, on=False):
         self.plottingOn = on

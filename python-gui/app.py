@@ -180,6 +180,7 @@ class Plotter(QWidget):
         self.currentlyPlotting = False
         self.data = np.array([])
         self.traces = []
+        # self.ptr = 0
 
         # application showing
         self.setLayout(self.vbox)
@@ -254,21 +255,26 @@ class Plotter(QWidget):
         # to make the plot as a while move left
         # might take this out
         # self.ww -= 1
-        fixedNewData = np.array([[i] for i in newData])
+        fixedNewData = np.array([i for i in newData])
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
             self.data += fixedNewData
+            starting = True
         else:
+            # self.ptr += 1
             self.data = np.concatenate((self.data, fixedNewData), axis=1)
+            starting = False
         # self.data = np.append(self.data, newData[0])
-        if self.data[0].size == 1:
+        # if self.data[0].size == 1:
+        if starting:
             for i in range(len(self.data)):
                 plot = self.plotWidget.plot(
-                    self.data[i], pen=(i, self.data.size) ) # name=i
+                    self.data[i], pen=(i, self.data.size))  # name=i
                 self.traces.append(plot)
         else:
             for i in range(len(self.data)):
                 self.traces[i].setData(self.data[i])
+                # self.traces[i].setPos(-self.ptr, 0)
             # this is what repositions the plot
             # self.plot.setPos(self.ww, 0)
             QtGui.QApplication.processEvents()
@@ -308,6 +314,7 @@ class Plotter(QWidget):
         if self.data.size == 0:
             print("No data has been plotted")
         else:
+            # self.ptr = 0
             self.legend.scene().removeItem(self.legend)
             for i in range(len(self.data)):
                 print(self.traces[i])
