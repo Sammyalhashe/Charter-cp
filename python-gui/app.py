@@ -10,43 +10,16 @@ import numpy as np
 from styles import styles
 from data import dataRPC
 
-# import threading
-# import zerorpc
 ###############################################################################
 
+# mapping created for string to pyqt widget class
+# used in a creator function below -> widgetCreator
 mapping = {
     'button': QPushButton,
     'dropdown': QComboBox,
     'text': QLineEdit,
     'plot': pg.PlotWidget
 }
-
-###############################################################################
-
-
-class thread_runner(object):
-    """thread_runner"""
-
-    def __init__(self):
-        """__init__"""
-        # self.data_rpc = dataRPC()
-        # self.thread = threading.Thread(target=self.init_daemon, args=())
-        # self.thread.daemon = True
-        # self.thread.start()
-
-    def get_rpc(self):
-        """get_rpc"""
-        # if not self.data_rpc:
-        # self.data_rpc = dataRPC()
-
-    def init_daemon(self):
-        """init_daemon"""
-        # if not self.data_rpc:
-        # self.get_rpc()
-        # s = zerorpc.Server(self.data_rpc)
-        # s.bind("tcp://0.0.0.0:4242")
-        # s.run()
-        # sys.stdout.flush()
 
 
 ###############################################################################
@@ -57,19 +30,9 @@ class Plotter(QWidget):
         """__init__"""
         # application init
         super().__init__()
-        # self.initThread()
         self.data_rpc = dataRPC()
         self.observer = None
         self.init_UI()
-
-    def initThread(self):
-        """initThread"""
-        # self.thread = thread_runner()
-        # zerorpc setup
-        # self.c = zerorpc.Client()
-        # self.c.connect("tcp://0.0.0.0:4242")
-        # self.observer = None
-        pass
 
     def widgetCreator(self, widget, **kwargs):
         """widgetCreator
@@ -111,7 +74,13 @@ class Plotter(QWidget):
         # common component init
         self.btn = QPushButton("Start", self)
         self.stop = QPushButton("Stop", self)
-        # self.clear = QPushButton("Clear Plot", self)
+        self.btn.setStyleSheet(
+            'QPushButton {background-color: #A3C1DA; color: blue;}')
+        self.stop.setStyleSheet(
+            'QPushButton {background-color: #A3C1DA; color: red;}')
+
+        # example usages of widgetCreator in case you wanted to make use of it
+        # as you can see, it gives you some flexibility
         self.clear = self.widgetCreator(
             'button',
             text='Clear',
@@ -124,15 +93,11 @@ class Plotter(QWidget):
             name='saveButton',
             backColor='teal',
             color='orange')
+
         self.Xtext = QLineEdit("Label for x-axis", self)
         self.Ytext = QLineEdit("Label for y-axis", self)
 
-        self.btn.setStyleSheet(
-            'QPushButton {background-color: #A3C1DA; color: blue;}')
-        self.stop.setStyleSheet(
-            'QPushButton {background-color: #A3C1DA; color: red;}')
-
-        # combobox init
+        # combobox init: For choosing the channels
         self.YcomboBox = QComboBox(self)
         self.YcomboBox.setGeometry(QRect(40, 40, 491, 31))
         self.YcomboBox.setObjectName(("Pick Y Axis"))
@@ -143,6 +108,7 @@ class Plotter(QWidget):
         self.initComboBox(self.XcomboBox)
 
         # functionality
+        # connects all the buttons/labels to their associated functions
         self.btn.clicked.connect(lambda _: self.plotData())
         self.stop.clicked.connect(lambda _: self.stopData())
         self.clear.clicked.connect(lambda _: self.clearData())
@@ -172,8 +138,6 @@ class Plotter(QWidget):
 
         self.vbox.addLayout(self.grid_layout)
         self.vbox.addWidget(self.plotWidget)
-        # self.grid_layout.addWidget(self.plot, 2, 0)
-        # self.grid_layout.setRowStretch(0, 2)
 
         # plotting variables
         self.subscription = None
@@ -202,6 +166,12 @@ class Plotter(QWidget):
             box.addItem(name)
 
     def setTitle(self):
+        """
+        setTitle
+
+        Sets the title of the plot based on the QLineEdits for the
+        x/y label
+        """
         xtext = self.Xtext.text()
         ytext = self.Ytext.text()
         self.plotWidget.setTitle("""
@@ -209,6 +179,10 @@ class Plotter(QWidget):
                                  """.format(ytext, xtext))
 
     def setXLabel(self):
+        """
+        setXLabel
+        Same as set title but for the xlabel
+        """
         xtext = self.Xtext.text()
         html = """
             <style>{0}</style>
@@ -217,6 +191,10 @@ class Plotter(QWidget):
         self.plotWidget.setLabel('bottom', text=html)
 
     def setYLabel(self):
+        """
+        setYLabel
+        Same as set title but for the ylabel
+        """
         ytext = self.Ytext.text()
         html = """
             <style>{0}</style>
@@ -225,26 +203,46 @@ class Plotter(QWidget):
         self.plotWidget.setLabel('left', text=html)
 
     def getObserver(self):
-        """getObserver"""
+        """
+        getObserver
+        Frontend and backend communicate with an RxPy Subject.
+        This function grabs the observer from the backend for communication
+        to occur
+        """
         if not self.observer:
+            # tells the backend to activate (instantiate) the Subject
             self.data_rpc.activateStream()
+            # grab the subject; I call it observer as a Subject can act as
+            # both an observer and observable, but in the frontend it only
+            # acts as the observer.
             self.observer = self.data_rpc.getStream()
 
     def plotData(self):
         """plotData"""
+        # if plotting is already happening
         if self.currentlyPlotting:
-            print("Already plotting")
+            self.messageBox("Already Plotting")
             return
+        # If not plotting, but there is already data on the plot,
+        # first clear, and then starting plotting again
         if self.data is not None and self.data.size != 0:
             self.clearData()
-        self.legend = self.plotWidget.addLegend()
+        # I need to figure out how to not make the legend mess up the data
+        # saving. So removed for now
+        # self.legend = self.plotWidget.addLegend()
+
+        # set that we are plotting
         self.currentlyPlotting = True
-        self.ww = 0
+        # if we have not yet grabbed the observer from the backend, get it
         if not self.observer:
             self.getObserver()
+        # if we have not yet subscribed to the observer, or if we stopped
+        # subscribing to the observer, subscribe to it
         if not self.subscription:
             self.subscription = self.observer.subscribe_(
                 lambda x: self.addData(x))
+        # this is the function that starts the data collection in the backend
+        # the on variable starts and stops data observation in the backend
         self.data_rpc.getData_test(on=True)
 
     def addData(self, newData):
@@ -252,31 +250,35 @@ class Plotter(QWidget):
         Adds a single data point to a trace
         :param newData: single new data point to add
         """
-        # to make the plot as a while move left
-        # might take this out
-        # self.ww -= 1
+        # refactor the new incoming data
         fixedNewData = np.array([i for i in newData])
+        # if we are at the start of plotting
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
             self.data += fixedNewData
+
+            # this is the first time adding data
             starting = True
+        # data already exists, concatenate it
         else:
             # self.ptr += 1
             self.data = np.concatenate((self.data, fixedNewData), axis=1)
+
+            # there is already data
             starting = False
-        # self.data = np.append(self.data, newData[0])
-        # if self.data[0].size == 1:
+        # Since we are just starting, we create new traces for each channel
+        # and add the first set of datapoints to those traces
         if starting:
             for i in range(len(self.data)):
                 plot = self.plotWidget.plot(
                     self.data[i], pen=(i, self.data.size))  # name=i
                 self.traces.append(plot)
+        # The traces already exist. Add the new data to each of the already
+        # existing traces
         else:
             for i in range(len(self.data)):
                 self.traces[i].setData(self.data[i])
-                # self.traces[i].setPos(-self.ptr, 0)
-            # this is what repositions the plot
-            # self.plot.setPos(self.ww, 0)
+            # this is necessary for data smoothly being added/removed from plot
             QtGui.QApplication.processEvents()
 
     def stopData(self):
@@ -286,42 +288,42 @@ class Plotter(QWidget):
         """
 
         # a boolean for keeping track if we are currently plotting
+        # we set it false as we are stopping plotting
         self.currentlyPlotting = False
+
+        # if there is not a subscription, data wasn't being plotted anyways
         if not self.subscription:
-            print("No data is being plotted")
+            self.messageBox("No data is being plotted")
+        # there is a subscription that we mean to stop.
+        # The subscription is destroyed and we tell the backend to stop
+        # plotting by using the toggleListening(on=boolean) function
         else:
             self.subscription.dispose()
             self.subscription = None
             self.data_rpc.toggleListening(on=self.currentlyPlotting)
             QtGui.QApplication.processEvents()
 
-    def resumeData(self):
-        if not self.subscription:
-            print("No data is being plotted")
-        else:
-            self.currentlyPlotting = True
-            self.data_rpc.toggleListening(on=self.currentlyPlotting)
-
     def clearData(self):
         """clearData
         Clears the plot of all traces
         """
+        # If there is a subscription, plotting hasn't been stopped
+        # remind the user to stop plotting before trying to clear
         if self.subscription is not None:
-            print("Stop plotting before you clear")
             self.messageBox("Stop plotting before you clear")
             return
-        print(self.data.size)
+
+        # if the data is empty, there is no data to clear
         if self.data.size == 0:
-            print("No data has been plotted")
+            self.messageBox("No data has been plotted")
+        # remove all data from traces and clear data
         else:
-            # self.ptr = 0
-            self.legend.scene().removeItem(self.legend)
+            # self.legend.scene().removeItem(self.legend)
             for i in range(len(self.data)):
                 print(self.traces[i])
                 self.traces[i].clear()
+            self.plotWidget.clear()
             self.data = np.array([])
-            # self.ww = 0
-            # self.plot.setPos(self.ww, 0)
 
     def saveData(self):
         """saveData
