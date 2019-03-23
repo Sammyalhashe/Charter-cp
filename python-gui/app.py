@@ -239,8 +239,8 @@ class Plotter(QWidget):
         # if we have not yet subscribed to the observer, or if we stopped
         # subscribing to the observer, subscribe to it
         if not self.subscription:
-            self.subscription = self.observer.subscribe_(
-                lambda x: self.addData(x))
+            self.subscription = self.observer.subscribe_(lambda x: self.
+                                                         addData(x))
         # this is the function that starts the data collection in the backend
         # the on variable starts and stops data observation in the backend
         self.data_rpc.getData_test(on=True)
@@ -271,7 +271,8 @@ class Plotter(QWidget):
         if starting:
             for i in range(len(self.data)):
                 plot = self.plotWidget.plot(
-                    self.data[i], pen=(i, self.data.size))  # name=i
+                    self.data[i], pen=(i, self.data.size),
+                    name=str(i))  # name=i
                 self.traces.append(plot)
         # The traces already exist. Add the new data to each of the already
         # existing traces
@@ -322,17 +323,31 @@ class Plotter(QWidget):
             for i in range(len(self.data)):
                 print(self.traces[i])
                 self.traces[i].clear()
-            self.plotWidget.clear()
+            self.traces = []
+            # self.plotWidget.clear()
             self.data = np.array([])
 
     def saveData(self):
         """saveData
         Saves the data in csv format
         """
+        self.exportToCSV()
         if not self.currentlyPlotting and self.data.size != 0:
             exporter = pg_e.CSVExporter(self.plotWidget.plotItem)
             exporter.export(fileName='data.csv')
             self.messageBox('Data saved to data.csv')
+        else:
+            self.messageBox(
+                "Make sure you aren't plotting, or there is no data")
+
+    def exportToCSV(self):
+        print(self.data.shape)
+        num_channels, n = self.data.shape
+
+        # data_csv = ""
+        print(self.data[0])
+        for i in range(n):
+            pass
 
 
 ###############################################################################
