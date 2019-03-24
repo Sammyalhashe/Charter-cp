@@ -243,7 +243,9 @@ class Plotter(QWidget):
                                                          addData(x))
         # this is the function that starts the data collection in the backend
         # the on variable starts and stops data observation in the backend
-        self.data_rpc.getData_test(on=True)
+        # prod=boolean is a variable that sets whether we retrieve test/actual
+        # values
+        self.data_rpc.getData_test(on=True, prod=False)
 
     def addData(self, newData):
         """addData
