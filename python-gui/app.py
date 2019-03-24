@@ -239,8 +239,14 @@ class Plotter(QWidget):
         # if we have not yet subscribed to the observer, or if we stopped
         # subscribing to the observer, subscribe to it
         if not self.subscription:
-            self.subscription = self.observer.subscribe_(lambda x: self.
-                                                         addData(x))
+            # depending on the current rx version, try different versions 
+            # of subscribe since the older versions use subscribe_()
+            try:
+                self.subscription = self.observer.subscribe_(lambda x: self.
+                                                            addData(x))
+            except:
+                self.subscription = self.observer.subscribe(lambda x: self.
+                                                            addData(x))
         # this is the function that starts the data collection in the backend
         # the on variable starts and stops data observation in the backend
         # prod=boolean is a variable that sets whether we retrieve test/actual
