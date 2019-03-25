@@ -52,22 +52,26 @@ class dataRPC():
             stream_arr.append(random()*5)
         self.stream.on_next(stream_arr)
 
-    def getData_test(self, on=False, prod=False):
+    def getData_test(self, on=False, prod=False, channels=[True,True,True,True]):
         """getData_test
         Function that starts the test data observation
 
         :param on: a boolean that keeps track if the program should be
         listening to the larry box.
+        :param prod: a boolean that determines whether data is simulated
+        or fetched from larry box. True: fetch from larrybox. False: simulate
+        :param channels: a list of booleans (size 4) that indicate which channels
+        on the larry box to collect data from. only applicable when prod=True
         """
         self.plottingOn = on
         while self.plottingOn:
             if not prod:
                 self.getData_s()
             else:
-                self.getData_larrybox()
+                self.getData_larrybox(channels)
             time.sleep(0.25)
 
-    def getData_larrybox(self):
+    def getData_larrybox(self, channels):
 
         if not self.stream:
             self.activateStream()
@@ -76,45 +80,64 @@ class dataRPC():
         start = time.time()
         end = start
 
-        values1 = []
-        values2 = []
-        values3 = []
-        values4 = []
-        timeline = []
+        # values1 = []
+        # values2 = []
+        # values3 = []
+        # values4 = []
+        # timeline = []
 
-        for i in range(n):
-            values1.append(0)
-            values2.append(0)
-            values3.append(0)
-            values4.append(0)
-            timeline.append(0)
+        # for i in range(n):
+        #     values1.append(0)
+        #     values2.append(0)
+        #     values3.append(0)
+        #     values4.append(0)
+        #     timeline.append(0)
+
+        stream_arr = []
+        timeline = None
+
+        # append one list for each active channel
+        for i in range(sum(channels)):
+            stream_arr.append([])
 
         with nida.Task() as task:
-            task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
-            task.ai_channels.add_ai_voltage_chan("Dev1/ai1")
-            task.ai_channels.add_ai_voltage_chan("Dev1/ai2")
-            task.ai_channels.add_ai_voltage_chan("Dev1/ai3")
+            # initialize all channels based on frontend input of boolean array
+            if (channels[0]):
+                task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
+            if (channels[1]):
+                task.ai_channels.add_ai_voltage_chan("Dev1/ai1")
+            if (channels[2]):
+                task.ai_channels.add_ai_voltage_chan("Dev1/ai2")
+            if (channels[3]):
+                task.ai_channels.add_ai_voltage_chan("Dev1/ai3")
             reading = task.read(n)
 
             end = time.time()
 
-            values1.extend(reading[0])
-            values2.extend(reading[1])
-            values3.extend(reading[2])
-            values4.extend(reading[3])
-            timeline.extend(end - start)
+            # for each active channel, add data to separate lists in stream_arr
+            for i in range(sum(channels)):
+                stream_arr[i].extend(reading[i])
 
-            del (values1[:n])
-            del (values2[:n])
-            del (values3[:n])
-            del (values4[:n])
-            del (timeline[:-1])
+            # append time period of the data readings to stream_arr
+            stream_arr.append(end-start)
 
-            stream_arr = []
-            stream_arr.append(values1)
-            stream_arr.append(values2)
-            stream_arr.append(values3)
-            stream_arr.append(values4)
+            # values1.extend(reading[0])
+            # values2.extend(reading[1])
+            # values3.extend(reading[2])
+            # values4.extend(reading[3])
+            # timeline.extend(end - start)
+
+            # del (values1[:n])
+            # del (values2[:n])
+            # del (values3[:n])
+            # del (values4[:n])
+            # del (timeline[:-1])
+
+            # stream_arr = []
+            # stream_arr.append(values1)
+            # stream_arr.append(values2)
+            # stream_arr.append(values3)
+            # stream_arr.append(values4)
             self.stream.on_next(stream_arr)
 
     def toggleListening(self, on=False):
