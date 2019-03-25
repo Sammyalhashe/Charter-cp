@@ -37,7 +37,7 @@ class dataRPC():
         if not self.stream:
             self.stream = Subject()
 
-    def getData_s(self, channels="1 2"):
+    def getData_s(self, channels="1 2", time_sim=True):
         """getData_s
         This function is a test function that mimics observing the data
         stream from the larry box.
@@ -47,7 +47,10 @@ class dataRPC():
         if not self.stream:
             self.activateStream()
         channels = channels.split(' ')
-        self.stream.on_next([[sin(random())] * 10 for i in channels])
+        stream_arr = [[sin(random())] * 10 for i in channels]
+        if (time_sim):
+            stream_arr.append(random()*5)
+        self.stream.on_next(stream_arr)
 
     def getData_test(self, on=False, prod=False):
         """getData_test
