@@ -167,6 +167,8 @@ class Plotter(QWidget):
         self.subscription = None
         self.currentlyPlotting = False
         self.data = np.array([])
+        self.timeline = np.array([])
+        self.current_time = None
         self.traces = []
         # self.ptr = 0
 
@@ -299,27 +301,34 @@ class Plotter(QWidget):
         # the on variable starts and stops data observation in the backend
         # prod=boolean is a variable that sets whether we retrieve test/actual
         # values
-        self.data_rpc.getData_test(on=True, prod=True)
+        self.data_rpc.getData_test(on=True, prod=False)
 
     def addData(self, newData):
         """addData
         Adds a single data point to a trace
         :param newData: single new data point to add
         """
+        # get the time window of the incoming data
+        data_period = newData.pop()
         # refactor the new incoming data
         fixedNewData = np.array([i for i in newData])
         # if we are at the start of plotting
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
             self.data += fixedNewData
-
+            self.timeline = np.linspace(0, data_period, fixedNewData.shape[1])
+            self.current_time = data_period
             # this is the first time adding data
             starting = True
         # data already exists, concatenate it
         else:
             # self.ptr += 1
             self.data = np.concatenate((self.data, fixedNewData), axis=1)
-
+            self.timeline = np.concatenate((self.timeline, 
+                                            np.linspace(self.current_time,
+                                                        self.current_time + data_period,
+                                                        fixedNewData.shape[1])))
+            self.current_time += data_period # update time position of next incoming data
             # there is already data
             starting = False
         # Since we are just starting, we create new traces for each channel
@@ -327,18 +336,21 @@ class Plotter(QWidget):
         if starting:
             for i in range(len(self.data)):
                 plot = self.plotWidget.plot(
-                    self.data[i], pen=(i + i*4, self.data.size),
+                    x=self.timeline,
+                    y=self.data[i],
+                    pen=(i + i*4, self.data.size),
                     name=str(i))  # name=i
                 self.traces.append(plot)
         # The traces already exist. Add the new data to each of the already
         # existing traces
         else:
             for i in range(len(self.data)):
-                self.traces[i].setData(self.data[i])
-                if (self.data.shape[1] < self.windowRange or self.X_autoscale): #CHANGED_HERE: aligns plotItem to left if it still fits within window
+                self.traces[i].setData(x=self.timeline,
+                                       y=self.data[i])
+                if (self.current_time < self.windowRange or self.X_autoscale): #CHANGED_HERE: aligns plotItem to left if it still fits within window
                     self.traces[i].setPos(0,0) 
                 else : # CHANGED_HERE. else, we just clip the plotItem accordingly
-                    self.traces[i].setPos(-self.data.shape[1]+self.windowRange+1,0) # CHANGED_HERE setPos of each plotItem
+                    self.traces[i].setPos(-self.current_time+self.windowRange,0) # CHANGED_HERE setPos of each plotItem
             # this is necessary for data smoothly being added/removed from plot
             QtGui.QApplication.processEvents()
 
@@ -386,6 +398,8 @@ class Plotter(QWidget):
             self.traces = []
             # self.plotWidget.clear()
             self.data = np.array([])
+            self.timeline = np.array([])
+            self.current_time = None
 
     def saveData(self):
         """saveData
