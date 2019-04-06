@@ -4,11 +4,13 @@ from rx.subjects import Subject
 import nidaqmx as nida
 import time
 from math import sin
+import numpy as np
 
 # from PyQt5.QtWidgets import QMessageBox
 
 ###############################################################################
 
+daq_chnl_names = ["Dev1/ai0", "Dev1/ai1", "Dev1/ai2", "Dev1/ai3"]
 
 class dataRPC():
     """dataRPC"""
@@ -37,22 +39,25 @@ class dataRPC():
         if not self.stream:
             self.stream = Subject()
 
-    def getData_s(self, channels="1 2", time_sim=True):
+    def getData_s(self, channels, x_axis, time_sim=True):
         """getData_s
         This function is a test function that mimics observing the data
         stream from the larry box.
 
         :param channels: string => How many channel you want to observe
         """
+        n = 1
+
         if not self.stream:
             self.activateStream()
-        channels = channels.split(' ')
-        stream_arr = [[sin(random())] * 10 for i in channels]
-        if (time_sim):
-            stream_arr.append(random()*5)
+        stream_arr = [[np.random.normal(0, 30)] * n for i in range(sum(channels))]
+        if (x_axis != 0):
+            stream_arr.append(random()-0.5)
+        elif (time_sim):
+            stream_arr.append(time.time())
         self.stream.on_next(stream_arr)
 
-    def getData_test(self, on=False, prod=False, channels=[True,True,True,True]):
+    def getData_test(self, on=False, prod=False, channels=[True,True,True,True], x_axis=0):
         """getData_test
         Function that starts the test data observation
 
@@ -66,32 +71,15 @@ class dataRPC():
         self.plottingOn = on
         while self.plottingOn:
             if not prod:
-                self.getData_s()
+                self.getData_s(channels,x_axis=x_axis)
             else:
-                self.getData_larrybox(channels)
-            time.sleep(0.25)
+                self.getData_larrybox(channels,x_axis=x_axis)
+            # time.sleep(0.25)
 
-    def getData_larrybox(self, channels):
+    def getData_larrybox(self, channels, x_axis, sampling_rate=10000):
 
         if not self.stream:
             self.activateStream()
-
-        n = 256
-        start = time.time()
-        end = start
-
-        # values1 = []
-        # values2 = []
-        # values3 = []
-        # values4 = []
-        # timeline = []
-
-        # for i in range(n):
-        #     values1.append(0)
-        #     values2.append(0)
-        #     values3.append(0)
-        #     values4.append(0)
-        #     timeline.append(0)
 
         stream_arr = []
         timeline = None
@@ -102,42 +90,37 @@ class dataRPC():
 
         with nida.Task() as task:
             # initialize all channels based on frontend input of boolean array
-            if (channels[0]):
-                task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
-            if (channels[1]):
-                task.ai_channels.add_ai_voltage_chan("Dev1/ai1")
-            if (channels[2]):
-                task.ai_channels.add_ai_voltage_chan("Dev1/ai2")
-            if (channels[3]):
-                task.ai_channels.add_ai_voltage_chan("Dev1/ai3")
-            reading = task.read(n)
+            # if (channels[0]):
+            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
+            # if (channels[1]):
+            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai1")
+            # if (channels[2]):
+            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai2")
+            # if (channels[3]):
+            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai3")
 
+            for i in range(4):
+                if (channels[i] and x_axis != i):
+                    task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
+            if (x_axis != -1):
+                task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
+
+            task.timing.cfg_samp_clk_timing(rate=sampling_rate) #can change sampling rate default 10000
+            reading = task.read(1) # read one sample from each channel at a time
             end = time.time()
 
             # for each active channel, add data to separate lists in stream_arr
-            for i in range(sum(channels)):
-                stream_arr[i].extend(reading[i])
+            if sum(channels)==1:
+                stream_arr[0].extend(reading)
+            else:
+                for i in range(sum(channels)):
+                    stream_arr[i].extend(reading[i])
 
             # append time period of the data readings to stream_arr
-            stream_arr.append(end-start)
-
-            # values1.extend(reading[0])
-            # values2.extend(reading[1])
-            # values3.extend(reading[2])
-            # values4.extend(reading[3])
-            # timeline.extend(end - start)
-
-            # del (values1[:n])
-            # del (values2[:n])
-            # del (values3[:n])
-            # del (values4[:n])
-            # del (timeline[:-1])
-
-            # stream_arr = []
-            # stream_arr.append(values1)
-            # stream_arr.append(values2)
-            # stream_arr.append(values3)
-            # stream_arr.append(values4)
+            if (x_axis == -1):
+                stream_arr.append(end)
+            else:
+                stream_arr[len(stream_arr)-1] = stream_arr[len(stream_arr)-1][0]
             self.stream.on_next(stream_arr)
 
     def toggleListening(self, on=False):
