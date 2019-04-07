@@ -44,15 +44,14 @@ class dataRPC():
         This function is a test function that mimics observing the data
         stream from the larry box.
 
-        :param channels: string => How many channel you want to observe
+        :param channels: list of booleans => which channels you want to observe
         """
         n = 1
-
         if not self.stream:
             self.activateStream()
-        stream_arr = [[np.random.normal(0, 30)] * n for i in range(sum(channels))]
+        stream_arr = [[sin(4 * (time.time()+i))] * n for i in range(sum(channels))]
         if (x_axis != 0):
-            stream_arr.append(random()-0.5)
+            stream_arr.append(sin(4 * (time.time()+4)))
         elif (time_sim):
             stream_arr.append(time.time())
         self.stream.on_next(stream_arr)
@@ -100,9 +99,9 @@ class dataRPC():
             #     task.ai_channels.add_ai_voltage_chan("Dev1/ai3")
 
             for i in range(4):
-                if (channels[i] and x_axis != i):
+                if (channels[i] and x_axis != i + 1):
                     task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
-            if (x_axis != -1):
+            if (x_axis != 0):
                 task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
 
             task.timing.cfg_samp_clk_timing(rate=sampling_rate) #can change sampling rate default 10000

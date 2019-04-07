@@ -2,7 +2,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, \
     QVBoxLayout, QPushButton, QLineEdit, QComboBox, QMessageBox, \
-    QInputDialog, QCheckBox
+    QInputDialog, QCheckBox, QLabel
 from PyQt5.QtCore import QRect  # pyqtSlot
 import pyqtgraph as pg
 import pyqtgraph.exporters as pg_e
@@ -129,7 +129,7 @@ class Plotter(QWidget):
             backColor='teal',
             color='orange')
 
-        self.windowRange = 2.  #### CHANGED_HERE default window of 10
+        self.windowRange = 5.  #### CHANGED_HERE default window of 10
         self.Y_lower = None # CHANGED_HERE user-set y-axis lower limit
         self.Y_upper = None # CHANGED_HERE user-set y-axis upper limit
         #self.X_autoscale = False # CHANGED_HERE boolean to switch on and off Y-autoscaling
@@ -139,11 +139,21 @@ class Plotter(QWidget):
                               # start deleting segments in FIFO order.
 
         # creating GUI elements
+        self.Ytext_QLabel = QLabel("Y-Axis Title: ")
+        self.Xtext_QLabel = QLabel("X-Axis Title: ")
         self.Xtext = CustomLineEdit("Label for x-axis")
         self.Ytext = CustomLineEdit("Label for y-axis")
-        self.Y_lower_text = CustomLineEdit("Lower Limit for y-axis") # CHANGED_HERE QLine for lower limit of Y-axis
-        self.Y_upper_text = CustomLineEdit("Upper Limit for y-axis") # CHANGED_HERE QLine for upper limit of Y-axis
-        self.windowRange_text = CustomLineEdit("Window Range (default: " + str(self.windowRange) + ")") # CHANGED_HERE QLine for window range. allow dude to change window size from gui. TODO: fit it nicely somewhere into gui.
+        self.YLimits_QLabel = QLabel("Range (y-axis): ")
+        self.Y_lower_text = CustomLineEdit("Lower Limit for y-axis")
+        self.Y_upper_text = CustomLineEdit("Upper Limit for y-axis")
+        self.XLimits_QLabel = QLabel("Range (x-axis): ")
+        self.X_lower_text = CustomLineEdit("Lower Limit for x-axis")
+        self.X_upper_text = CustomLineEdit("Upper Limit for x-axis")
+        self.XLimits_QLabel.setVisible(False)
+        self.X_lower_text.setVisible(False)
+        self.X_upper_text.setVisible(False)
+        self.windowRange_QLabel = QLabel("Window Range: ")
+        self.windowRange_text = CustomLineEdit(str(self.windowRange) + " (default)") # CHANGED_HERE QLine for window range. allow dude to change window size from gui. TODO: fit it nicely somewhere into gui.
         self.autoscale_Y = QPushButton("AutoY", self) # CHANGED_HERE turn on and off autoscaling of Y axis
         self.autoscale_X = QPushButton("AutoX", self) # CHANGED_HERE turn on and off autoscaling of X axis
         self.autoscale_X.setCheckable(True)
@@ -162,12 +172,13 @@ class Plotter(QWidget):
         self.line_chkbox = QCheckBox("Line", self)
         self.line_chkbox.setChecked(True)
 
+        self.x_axis_ComboBox_QLabel = QLabel("X-Axis: ")
         self.x_axis_ComboBox = QComboBox(self)
-        self.x_axis_ComboBox.addItem('X-Axis: Time (Default)')
+        self.x_axis_ComboBox.addItem('Time (Default)')
         # WARNING: channels are referenced by their indices in combobox list
         #          if you change the ordering, you will need to change the behaviour
         #          in self.change_x_axis()
-        items = ["X-Axis: Channel {}".format(i + 1) for i in range(4)]
+        items = ["Channel {}".format(i + 1) for i in range(4)]
         for name in items:
             self.x_axis_ComboBox.addItem(name)
 
@@ -191,8 +202,10 @@ class Plotter(QWidget):
         self.Ytext.textEdited.connect(self.setTitle)
         self.Xtext.textEdited.connect(self.setXLabel)
         self.Ytext.textEdited.connect(self.setYLabel)
-        self.Y_lower_text.textEdited.connect(self.setYRange) # CHANGED_HERE
-        self.Y_upper_text.textEdited.connect(self.setYRange) # CHANGED_HERE
+        self.Y_lower_text.textEdited.connect(self.setYRange)
+        self.Y_upper_text.textEdited.connect(self.setYRange)
+        self.X_lower_text.textEdited.connect(self.setXRange)
+        self.X_upper_text.textEdited.connect(self.setXRange)
         self.autoscale_X.clicked.connect(lambda _: self.setAutoscale(0)) # CHANGED_HERE, TODO should we change this to a toggle?
         self.autoscale_Y.clicked.connect(lambda _: self.setAutoscale(1)) # CHANGED_HERE, TODO should we change this to a toggle?
         self.windowRange_text.textEdited.connect(self.setWindowRange) # CHANGED_HERE connects Qline to function call
@@ -217,27 +230,38 @@ class Plotter(QWidget):
         self.grid_layout.setSpacing(8)
 
         # adding the widgets to the layout
-        self.grid_layout.addWidget(self.chnl1_button,3,0,1,4)
-        self.grid_layout.addWidget(self.chnl2_button,3,4,1,4)
-        self.grid_layout.addWidget(self.chnl3_button,3,8,1,4)
-        self.grid_layout.addWidget(self.chnl4_button,3,12,1,4)
         #self.grid_layout.addWidget(CustomLineEdit("hwllo"),4,0,1,8)
         #self.grid_layout.addWidget(self.YcomboBox, 0, 0, -1, 2)
         #self.grid_layout.addWidget(self.XcomboBox, 0, 1, -1, 2)
-        self.grid_layout.addWidget(self.btn, 0, 16)
-        self.grid_layout.addWidget(self.stop, 0, 17)
-        self.grid_layout.addWidget(self.Ytext, 0, 0,1,8)
-        self.grid_layout.addWidget(self.Xtext, 0, 8,1,8)
-        self.grid_layout.addWidget(self.clear, 1, 16)
-        self.grid_layout.addWidget(self.save, 1, 17)
-        self.grid_layout.addWidget(self.Y_lower_text, 1, 0,1,8) #
-        self.grid_layout.addWidget(self.Y_upper_text, 1, 8,1,8) #
-        self.grid_layout.addWidget(self.windowRange_text, 2, 0,1,8) # put it somewhere proper. temporary position
-        self.grid_layout.addWidget(self.autoscale_Y, 2, 16) #
-        self.grid_layout.addWidget(self.autoscale_X, 2, 17) #
-        self.grid_layout.addWidget(self.x_axis_ComboBox,2,8,1,8)
-        self.grid_layout.addWidget(self.line_chkbox, 3, 16)
-        self.grid_layout.addWidget(self.scatter_chkbox, 3, 17)
+        self.grid_layout.addWidget(self.Ytext_QLabel, 0, 0, 1, 2)
+        self.grid_layout.addWidget(self.Ytext, 0, 2, 1, 10)
+        self.grid_layout.addWidget(self.Xtext_QLabel, 0, 12, 1, 2)
+        self.grid_layout.addWidget(self.Xtext, 0, 14, 1, 10)
+        self.grid_layout.addWidget(self.btn, 0, 24)
+        self.grid_layout.addWidget(self.stop, 0, 25)
+
+        self.grid_layout.addWidget(self.YLimits_QLabel, 1, 0, 1, 2)
+        self.grid_layout.addWidget(self.Y_lower_text, 1, 2, 1, 5)
+        self.grid_layout.addWidget(self.Y_upper_text, 1, 7, 1, 5)
+        self.grid_layout.addWidget(self.x_axis_ComboBox_QLabel, 1, 12, 1, 2)
+        self.grid_layout.addWidget(self.x_axis_ComboBox, 1, 14, 1, 10)
+        self.grid_layout.addWidget(self.clear, 1, 24)
+        self.grid_layout.addWidget(self.save, 1, 25)
+
+        self.grid_layout.addWidget(self.windowRange_QLabel, 2, 0, 1, 2)
+        self.grid_layout.addWidget(self.windowRange_text, 2, 2, 1, 10)
+        self.grid_layout.addWidget(self.XLimits_QLabel, 2, 0, 1, 2)
+        self.grid_layout.addWidget(self.X_lower_text, 2, 2, 1, 5)
+        self.grid_layout.addWidget(self.X_upper_text, 2, 7, 1, 5)
+        self.grid_layout.addWidget(self.autoscale_Y, 2, 24) #
+        self.grid_layout.addWidget(self.autoscale_X, 2, 25) #
+
+        self.grid_layout.addWidget(self.chnl1_button,3,0,1,6)
+        self.grid_layout.addWidget(self.chnl2_button,3,6,1,6)
+        self.grid_layout.addWidget(self.chnl3_button,3,12,1,6)
+        self.grid_layout.addWidget(self.chnl4_button,3,18,1,6)
+        self.grid_layout.addWidget(self.line_chkbox, 3, 24)
+        self.grid_layout.addWidget(self.scatter_chkbox, 3, 25)
 
         self.vbox.addLayout(self.grid_layout)
         self.vbox.addWidget(self.plotWidget)
@@ -266,11 +290,9 @@ class Plotter(QWidget):
         self.show()
 
     def togglePlotStyle(self, line=None, scatter=None):
-
         if (line == None and scatter == None): # if this was called through user checkbox, fetch values
             line = self.line_chkbox.isChecked()
             scatter = self.scatter_chkbox.isChecked()
-        # else, it was called programatically, so parameters should be supplied. None maintains current state.
         if (self.currentlyPlotting):
             for i in range(len(self.traces)):
                 if (scatter == True):
@@ -290,10 +312,20 @@ class Plotter(QWidget):
             self.autoscale_X.setChecked(True)
             self.autoscale_Y.setChecked(True)
             self.setAutoscale() # update autoscaling
+            self.windowRange_QLabel.setVisible(False)
+            self.windowRange_text.setVisible(False)
+            self.XLimits_QLabel.setVisible(True)
+            self.X_lower_text.setVisible(True)
+            self.X_upper_text.setVisible(True)
         else:
             self.autoscale_X.setChecked(False)
             self.autoscale_Y.setChecked(True)
             self.setAutoscale() # update autoscaling
+            self.XLimits_QLabel.setVisible(False)
+            self.X_lower_text.setVisible(False)
+            self.X_upper_text.setVisible(False)
+            self.windowRange_QLabel.setVisible(True)
+            self.windowRange_text.setVisible(True)
         if (self.currentlyPlotting):
             self.stopData()
             self.clearData()
@@ -322,6 +354,18 @@ class Plotter(QWidget):
         except:
             self.Y_lower = None
             self.Y_upper = None
+
+    def setXRange(self): #CHANGED_HERE
+        try:
+            self.X_lower = float(self.X_lower_text.text())
+            self.X_upper = float(self.X_upper_text.text())
+            self.plotWidget.setXRange(self.X_lower, self.X_upper)
+            self.plotWidget.enableAutoRange(axis=0, enable=False)
+            self.autoscale_X.setChecked(False)
+        except:
+            self.Y_lower = None
+            self.Y_upper = None
+
 
     def setWindowRange(self): ## CHANGED_HERE : function to connect to GUI. allows user to change window size
         try:
@@ -494,6 +538,7 @@ class Plotter(QWidget):
                         pen= colours[index] if self.line_chkbox.isChecked() else None,
                         symbol='o' if self.scatter_chkbox.isChecked() else None,
                         symbolBrush= colours[index] if self.scatter_chkbox.isChecked() else None,
+                        symbolSize=5,
                         name=channel_names[i])  # name=i
                     index += 1
                     self.traces.append(plot)
