@@ -3,7 +3,7 @@ from random import random
 from rx.subjects import Subject
 import nidaqmx as nida
 import time
-from math import sin
+from math import sin, cos
 import numpy as np
 
 # from PyQt5.QtWidgets import QMessageBox
@@ -51,7 +51,7 @@ class dataRPC():
             self.activateStream()
         stream_arr = [[sin(4 * (time.time()+i))] * n for i in range(sum(channels))]
         if (x_axis != 0):
-            stream_arr.append(sin(4 * (time.time()+4)))
+            stream_arr.append(cos(4 * (time.time())))
         elif (time_sim):
             stream_arr.append(time.time())
         self.stream.on_next(stream_arr)

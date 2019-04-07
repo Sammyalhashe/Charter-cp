@@ -38,6 +38,15 @@ colours = {
     4: 'c'  
 }
 
+##############################################################################################
+# There's a bug with the pyqtgraph library that interferes with image exports.
+# One workaround is to edit the library directly. Search for ImageExporter.py and
+# replace line 70 with the following:
+# bg = np.empty((int(self.params['width']), int(self.params['height']), 4),dtype=np.ubyte)
+# another non-intrusive way is to override the default params, which is done in saveData below.
+# second method is however just a workaround until pyqt gets their shit together.
+##############################################################################################
+
 # Custom textbox that inherits from QLineEdit.
 # Added functionality: Will highlight all text upon mouseclick
 class CustomLineEdit(QLineEdit):
@@ -629,6 +638,11 @@ class Plotter(QWidget):
                 return
             filename += '.png'
             exporter = pg_e.ImageExporter(self.plotWidget.plotItem)
+            # these following two lines circumvent the bug in pyqt library.
+            # once the pyqt authors have fixed it in future updates, they shouldn't
+            # be needed.
+            exporter.params.param('width').setValue(1920, blockSignal=exporter.widthChanged)
+            exporter.params.param('height').setValue(1080, blockSignal=exporter.heightChanged)
             exporter.export(fileName=filename)
             self.messageBox('Data saved to ' + filename)
         else:
