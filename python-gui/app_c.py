@@ -132,11 +132,6 @@ class Plotter(QWidget):
         self.windowRange = 5.  #### CHANGED_HERE default window of 10
         self.Y_lower = None # CHANGED_HERE user-set y-axis lower limit
         self.Y_upper = None # CHANGED_HERE user-set y-axis upper limit
-        #self.X_autoscale = False # CHANGED_HERE boolean to switch on and off Y-autoscaling
-        self.plotSegments = 100 # CHANGED_HERE segment the plot into smaller plotItems for memory management
-        self.maxSegments = 20 # CHANGED_HERE only allow this number of 
-                              # segments on the plot at a time. After this, 
-                              # start deleting segments in FIFO order.
 
         # creating GUI elements
         self.Ytext_QLabel = QLabel("Y-Axis Title: ")
@@ -276,6 +271,8 @@ class Plotter(QWidget):
         self.channels = [True, False, False, False] # default channel selection
         self.x_axis_selection = 0 # indicates which channel {1,2,3,4} is x-axis. 0 indicates time.
         self.legend = None
+        self.traceSegment = 1000 # each trace should only hold 1000 datapoints max
+        self.maxSegments = 20 # max number of traces allowed
         # self.ptr = 0
 
         # application showing
@@ -608,30 +605,44 @@ class Plotter(QWidget):
         """saveData
         Saves the data in csv format
         """
-        self.exportToCSV()
+        #self.exportToCSV()
         if not self.currentlyPlotting and self.data.size != 0:
+            # fetch date and time to use as default filename
             currentDT = datetime.datetime.now()
-            defaultname = currentDT.strftime("plot_%Y-%m-%d_%H-%M-%S")
-            (filename,ok)=QInputDialog.getText(self,"Export to CSV","Filename (without .csv):                  ",
-                                                QLineEdit.Normal,defaultname)
+            defaultnameCSV = currentDT.strftime("data_%Y-%m-%d_%H-%M-%S")
+            defaultnamePNG = currentDT.strftime("plot_%Y-%m-%d_%H-%M-%S")
+
+            # first, prompt user if they want to save as .csv
+            (filename,ok)=QInputDialog.getText(self,"Data Export to CSV","Filename (without .csv):                  ",
+                                                QLineEdit.Normal,defaultnameCSV)
             if (not ok): # if user clicked cancel, stop saving
                 return
             filename += '.csv'
             exporter = pg_e.CSVExporter(self.plotWidget.plotItem)
             exporter.export(fileName=filename)
             self.messageBox('Data saved to ' + filename)
+
+            # then, prompt user if they want to save as .png
+            (filename,ok)=QInputDialog.getText(self,"Image Export to PNG","Filename (without .png):                  ",
+                                                QLineEdit.Normal,defaultnamePNG)
+            if (not ok): # if user clicked cancel, stop saving
+                return
+            filename += '.png'
+            exporter = pg_e.ImageExporter(self.plotWidget.plotItem)
+            exporter.export(fileName=filename)
+            self.messageBox('Data saved to ' + filename)
         else:
             self.messageBox(
                 "Make sure you aren't plotting, or there is no data")
 
-    def exportToCSV(self):
-        print(self.data.shape)
-        num_channels, n = self.data.shape
+    # def exportToCSV(self):
+    #     print(self.data.shape)
+    #     num_channels, n = self.data.shape
 
-        # data_csv = ""
-        print(self.data[0])
-        for i in range(n):
-            pass
+    #     # data_csv = ""
+    #     print(self.data[0])
+    #     for i in range(n):
+    #         pass
 
 
 ###############################################################################
