@@ -80,46 +80,32 @@ class dataRPC():
         if not self.stream:
             self.activateStream()
 
-        stream_arr = []
-        timeline = None
-
-        # append one list for each active channel
-        for i in range(sum(channels)):
-            stream_arr.append([])
-
         with nida.Task() as task:
-            # initialize all channels based on frontend input of boolean array
-            # if (channels[0]):
-            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
-            # if (channels[1]):
-            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai1")
-            # if (channels[2]):
-            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai2")
-            # if (channels[3]):
-            #     task.ai_channels.add_ai_voltage_chan("Dev1/ai3")
-
-            for i in range(4):
-                if (channels[i] and x_axis != i + 1):
-                    task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
-            if (x_axis != 0):
-                task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
-
-            task.timing.cfg_samp_clk_timing(rate=sampling_rate) #can change sampling rate default 10000
-            reading = task.read(1) # read one sample from each channel at a time
+            try:
+                for i in range(4):
+                    if (channels[i] and x_axis != i + 1):
+                        task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
+                if (x_axis != 0):
+                    task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
+                stream_arr = task.read(1) # read one sample from each channel at a time
+            except:
+                task.stop()
+                for i in range(4):
+                    if (channels[i] and x_axis != i + 1):
+                        task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
+                if (x_axis != 0):
+                    task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
+                stream_arr = task.read(1) # read one sample from each channel at a time
             end = time.time()
 
-            # for each active channel, add data to separate lists in stream_arr
-            if sum(channels)==1:
-                stream_arr[0].extend(reading)
-            else:
-                for i in range(sum(channels)):
-                    stream_arr[i].extend(reading[i])
-
             # append time period of the data readings to stream_arr
-            if (x_axis == -1):
+            if (x_axis == 0):
+                if sum(channels)==1:
+                    stream_arr = [stream_arr]
                 stream_arr.append(end)
             else:
                 stream_arr[len(stream_arr)-1] = stream_arr[len(stream_arr)-1][0]
+
             self.stream.on_next(stream_arr)
 
     def toggleListening(self, on=False):

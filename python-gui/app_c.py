@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtGui
 import numpy as np
 from styles import styles
 from data import dataRPC
-from time import time
+import time
 import datetime
 
 ###############################################################################
@@ -335,9 +335,18 @@ class Plotter(QWidget):
         if (self.currentlyPlotting):
             self.stopData()
             self.clearData()
+            self.toggleChannels()
             self.plotData()
+        else:
+            self.toggleChannels()
 
     def toggleChannels(self):
+        # if user is trying to plot channel against itself, block the attempt.
+        if (self.x_axis_selection != 0 and self.channel_buttons[self.x_axis_selection].isChecked()):
+            self.channel_buttons[self.x_axis_selection].setChecked(False)
+            if (self.channels[self.x_axis_selection - 1] == False): # if it was already plotting normally before, just return
+                return                                              # otherwise, proceed and reset the plot to stop
+                                                                    # channel from being plotted against itself.
         self.channels = [self.chnl1_button.isChecked(),
                          self.chnl2_button.isChecked(),
                          self.chnl3_button.isChecked(),
@@ -396,18 +405,6 @@ class Plotter(QWidget):
             if (not self.autoscale_X.isChecked()):
                 self.plotWidget.setXRange(0, self.windowRange)
             self.plotWidget.enableAutoRange(axis=1, enable=self.autoscale_Y.isChecked())
-        #self.X_autoscale = True if axis==0 else self.X_autoscale
-
-
-    # obsolete function, can be taken out
-    # def initComboBox(self, box):
-    #     """initComboBox
-
-    #     :param box: box reference to give values to
-    #     """
-    #     items = ["channel {}".format(i + 1) for i in range(4)]
-    #     for name in items:
-    #         box.addItem(name)
 
     def setTitle(self):
         """
@@ -497,7 +494,7 @@ class Plotter(QWidget):
         # the on variable starts and stops data observation in the backend
         # prod=boolean is a variable that sets whether we retrieve test/actual
         # values
-        self.data_rpc.getData_test(on=True, prod=False, channels=self.channels, x_axis=self.x_axis_selection)
+        self.data_rpc.getData_test(on=True, channels=self.channels, x_axis=self.x_axis_selection)
 
     def addData(self, newData):
         """addData
