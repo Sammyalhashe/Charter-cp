@@ -355,7 +355,9 @@ class Plotter(QWidget):
         4: Channel 4
         """
         self.x_axis_selection = self.x_axis_ComboBox.currentIndex() # fetch from GUI
-        # if x-axis was not previously in time-plotting mode, set defaults accordingly
+        # if x-axis is a channel, we set turn on autoscale,
+        # then hide self.windowRange_text and enable user to set
+        # both upper and lower limits of x range
         if (self.x_axis_selection != 0):
             self.autoscale_X.setChecked(True)
             self.autoscale_Y.setChecked(True)
@@ -365,6 +367,8 @@ class Plotter(QWidget):
             self.XLimits_QLabel.setVisible(True)
             self.X_lower_text.setVisible(True)
             self.X_upper_text.setVisible(True)
+        # else, the x-axis is time, so we restrict the user and only
+        # allow one QLineEdit for size adjustment of current window.
         else:
             self.autoscale_X.setChecked(False)
             self.autoscale_Y.setChecked(True)
@@ -375,7 +379,7 @@ class Plotter(QWidget):
             self.windowRange_QLabel.setVisible(True)
             self.windowRange_text.setVisible(True)
         # if x-axis channel selection was toggled while plotter was plotting
-        # restart the plot
+        # stop plotting, clear, then toggle channels accordingly and restart the plot
         if (self.currentlyPlotting):
             self.stopData()
             self.clearData()
@@ -708,7 +712,7 @@ class Plotter(QWidget):
             # first, prompt user if they want to save as .csv
             (filename,ok)=QInputDialog.getText(self,"Data Export to CSV","Filename (without .csv):                  ",
                                                 QLineEdit.Normal,defaultnameCSV)
-            if (ok): # if user clicked okay, start saving .csv. else pass
+            if (ok): # if user clicked okay, start saving .csv. else pass.
                 filename += '.csv' # append correct file format
                 exporter = pg_e.CSVExporter(self.plotWidget.plotItem)
                 exporter.export(fileName=filename)

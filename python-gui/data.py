@@ -6,8 +6,6 @@ import time
 from math import sin, cos
 import numpy as np
 
-# from PyQt5.QtWidgets import QMessageBox
-
 ###############################################################################
 
 daq_chnl_names = ["Dev1/ai0", "Dev1/ai1", "Dev1/ai2", "Dev1/ai3"]
