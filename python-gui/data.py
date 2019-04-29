@@ -76,7 +76,13 @@ class dataRPC():
             # time.sleep(0.25)
 
     def getData_larrybox(self, channels, x_axis, sampling_rate=10000):
+        """getData_larrybox
+        fetch data from larrybox
 
+        :param channels: list of 4 booleans to indicate which channels are being used
+        :param x_axis: integer indicating which channel is selected. reorders the output.
+        :param sampling rate: set sampling rate for fetching data from nidaqmx
+        """
         if not self.stream:
             self.activateStream()
 

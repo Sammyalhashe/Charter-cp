@@ -12,6 +12,7 @@ from styles import styles
 from data import dataRPC
 import time
 import datetime
+from copy import deepcopy
 
 ###############################################################################
 
@@ -24,18 +25,20 @@ mapping = {
     'plot': pg.PlotWidget
 }
 
+# channel names
 channel_names = ["Channel 1",
                  "Channel 2",
                  "Channel 3",
                  "Channel 4"]
 
+# dict table for default colours of plot display
 # permitted colours in pyqt for Qpen constructor is (b, g, r, c, m, y, k, w)
 colours = {
-    0: 'm', 
+    0: 'c', 
     1: 'w', 
     2: 'g', 
-    3: 'r',
-    4: 'c'  
+    3: 'm',
+    4: 'r'  
 }
 
 ##############################################################################################
@@ -47,22 +50,32 @@ colours = {
 # second method is however just a workaround until pyqt gets their shit together.
 ##############################################################################################
 
-# Custom textbox that inherits from QLineEdit.
-# Added functionality: Will highlight all text upon mouseclick
 class CustomLineEdit(QLineEdit):
+    """CustomLineEdit
+    Custom textbox that inherits from QLineEdit.
+    Added functionality: Will highlight all text upon mouseclick
+    """
     def __init__(self, name):
+        """__init__"""
         super().__init__(name)
-        self.readyToEdit = True
+        self.readyToEdit = True # decides whether to highlight all text on press
 
     def mousePressEvent(self, e, Parent=None):
+        """mousePressEvent
+        on first mouse click, select and highlight all text
+        for easy overwriting.
+        upon second press, deselect all text.
+        """
         super().mousePressEvent(e) #required to deselect on 2e click
         if self.readyToEdit:
             self.selectAll()
             self.readyToEdit = False
 
     def focusOutEvent(self, e):
-        super().focusOutEvent(e) #required to remove cursor on focusOut
-        # self.deselect()
+        """focusOutEvent
+        on focusOut, refreshes self.readyToEdit
+        """
+        super().focusOutEvent(e) #required to remove text cursor on focusOut
         self.readyToEdit = True
 
 
@@ -103,6 +116,7 @@ class Plotter(QWidget):
 
     def messageBox(self, message):
         """messageBox
+        creates a popup notication with custom text
 
         :param message: message to display on message box
         """
@@ -138,31 +152,45 @@ class Plotter(QWidget):
             backColor='teal',
             color='orange')
 
-        self.windowRange = 5.  #### CHANGED_HERE default window of 10
-        self.Y_lower = None # CHANGED_HERE user-set y-axis lower limit
-        self.Y_upper = None # CHANGED_HERE user-set y-axis upper limit
+        # plotting variables
+        self.subscription = None # indicate if subscription is present
+        self.currentlyPlotting = False # boolean to indicate plotter status
+        self.data = np.array([]) # y_axis numpy data
+        self.x_axis_data = np.array([]) # x_axis numpy data
+        self.current_time = None # current unix timestamp. used to normalize time-axis
+        self.traces = [] # list of all PlotDataItems currently on plotter
+        self.channels = [True, False, False, False] # default channel selection
+        self.previousChannels = None # store previous channel state when plotting is stopped
+        self.x_axis_selection = 0 # indicates which channel {1,2,3,4} is x-axis. 0 indicates time.
+        self.legend = None # stores a reference to the plot legend for subsequent deletion
+        self.traceSegment = 1000 # each trace should only hold 1000 datapoints max
+        self.maxSegments = 20 # max number of traces allowed
+        self.windowRange = 5.  # default window of 10
+        self.Y_lower = None # user-set y-axis lower limit
+        self.Y_upper = None # user-set y-axis upper limit
 
         # creating GUI elements
-        self.Ytext_QLabel = QLabel("Y-Axis Title: ")
-        self.Xtext_QLabel = QLabel("X-Axis Title: ")
-        self.Xtext = CustomLineEdit("Label for x-axis")
-        self.Ytext = CustomLineEdit("Label for y-axis")
-        self.YLimits_QLabel = QLabel("Range (y-axis): ")
-        self.Y_lower_text = CustomLineEdit("Lower Limit for y-axis")
-        self.Y_upper_text = CustomLineEdit("Upper Limit for y-axis")
-        self.XLimits_QLabel = QLabel("Range (x-axis): ")
-        self.X_lower_text = CustomLineEdit("Lower Limit for x-axis")
-        self.X_upper_text = CustomLineEdit("Upper Limit for x-axis")
-        self.XLimits_QLabel.setVisible(False)
-        self.X_lower_text.setVisible(False)
-        self.X_upper_text.setVisible(False)
-        self.windowRange_QLabel = QLabel("Window Range: ")
-        self.windowRange_text = CustomLineEdit(str(self.windowRange) + " (default)") # CHANGED_HERE QLine for window range. allow dude to change window size from gui. TODO: fit it nicely somewhere into gui.
-        self.autoscale_Y = QPushButton("AutoY", self) # CHANGED_HERE turn on and off autoscaling of Y axis
-        self.autoscale_X = QPushButton("AutoX", self) # CHANGED_HERE turn on and off autoscaling of X axis
-        self.autoscale_X.setCheckable(True)
-        self.autoscale_Y.setCheckable(True)
-        self.autoscale_Y.setChecked(True)
+        self.Ytext_QLabel = QLabel("Y-Axis Title: ") # text label
+        self.Xtext_QLabel = QLabel("X-Axis Title: ") # text label
+        self.Xtext = CustomLineEdit("Label for x-axis") # textbox for x-axis title
+        self.Ytext = CustomLineEdit("Label for y-axis") # textbox for y-axis title
+        self.YLimits_QLabel = QLabel("Range (y-axis): ") # text label
+        self.Y_lower_text = CustomLineEdit("Lower Limit for y-axis") # textbox for y-lower scale
+        self.Y_upper_text = CustomLineEdit("Upper Limit for y-axis") # textbox for y-upper scale
+        self.XLimits_QLabel = QLabel("Range (x-axis): ") # text label for x-window scaling. hidden in chnl vs chnl plotting.
+        self.X_lower_text = CustomLineEdit("Lower Limit for x-axis") # textbox for x-lower scale. hidden in time plotting.
+        self.X_upper_text = CustomLineEdit("Upper Limit for x-axis") # textbox for x-upper scale. hidden in time plotting.
+        self.XLimits_QLabel.setVisible(False) # plotter starts up with time-plotting selected, so hidden by default
+        self.X_lower_text.setVisible(False) # plotter starts up with time-plotting selected, so hidden by default
+        self.X_upper_text.setVisible(False) # plotter starts up with time-plotting selected, so hidden by default
+        self.windowRange_QLabel = QLabel("Window Range: ") # textbox for x-window size
+        self.windowRange_text = CustomLineEdit(str(self.windowRange) + " (default)") # default text for x-window size
+        self.autoscale_Y = QPushButton("AutoY", self) # turn on and off autoscaling of Y axis
+        self.autoscale_X = QPushButton("AutoX", self) # turn on and off autoscaling of X axis
+        self.autoscale_X.setCheckable(True) # enable toggling of button
+        self.autoscale_Y.setCheckable(True) # enable toggling of button
+        self.autoscale_Y.setChecked(True) # set autoscaling of Y to true by default
+        # buttons for selecting channels
         self.chnl1_button = QPushButton("Channel 1", self)
         self.chnl2_button = QPushButton("Channel 2", self)
         self.chnl3_button = QPushButton("Channel 3", self)
@@ -171,32 +199,28 @@ class Plotter(QWidget):
         self.chnl2_button.setCheckable(True)
         self.chnl3_button.setCheckable(True)
         self.chnl4_button.setCheckable(True)
+        # put all chnl buttons in a dict table to facilitate referencing in loops
+        self.channel_buttons = { 1:self.chnl1_button,
+                                 2:self.chnl2_button,
+                                 3:self.chnl3_button,
+                                 4:self.chnl4_button  }
         self.chnl1_button.setChecked(True) # Channel 1 is selected by default
+        # plot-display checkboxes. toggles scatter or line plot display
         self.scatter_chkbox = QCheckBox("Scatter", self)
         self.line_chkbox = QCheckBox("Line", self)
         self.line_chkbox.setChecked(True)
-
+        # combobox for x-axis channel selection
         self.x_axis_ComboBox_QLabel = QLabel("X-Axis: ")
         self.x_axis_ComboBox = QComboBox(self)
         self.x_axis_ComboBox.addItem('Time (Default)')
-        # WARNING: channels are referenced by their indices in combobox list
+        # WARNING: channels are referenced by their indices in combobox list.
         #          if you change the ordering, you will need to change the behaviour
         #          in self.change_x_axis()
         items = ["Channel {}".format(i + 1) for i in range(4)]
         for name in items:
             self.x_axis_ComboBox.addItem(name)
 
-        # combobox init: For choosing the channels
-        # self.YcomboBox = QComboBox(self)
-        # self.YcomboBox.setGeometry(QRect(40, 40, 491, 31))
-        # self.YcomboBox.setObjectName(("Pick Y Axis"))
-        # self.initComboBox(self.YcomboBox)
-        # self.XcomboBox = QComboBox(self)
-        # self.XcomboBox.setGeometry(QRect(40, 40, 491, 31))
-        # self.XcomboBox.setObjectName(("Pick X Axis"))
-        # self.initComboBox(self.XcomboBox)
-
-        # functionality
+        # functionality for all created GUI elements
         # connects all the buttons/labels to their associated functions
         self.btn.clicked.connect(lambda _: self.plotData())
         self.stop.clicked.connect(lambda _: self.stopData())
@@ -210,17 +234,13 @@ class Plotter(QWidget):
         self.Y_upper_text.textEdited.connect(self.setYRange)
         self.X_lower_text.textEdited.connect(self.setXRange)
         self.X_upper_text.textEdited.connect(self.setXRange)
-        self.autoscale_X.clicked.connect(lambda _: self.setAutoscale(0)) # CHANGED_HERE, TODO should we change this to a toggle?
-        self.autoscale_Y.clicked.connect(lambda _: self.setAutoscale(1)) # CHANGED_HERE, TODO should we change this to a toggle?
-        self.windowRange_text.textEdited.connect(self.setWindowRange) # CHANGED_HERE connects Qline to function call
+        self.autoscale_X.clicked.connect(lambda _: self.setAutoscale(0))
+        self.autoscale_Y.clicked.connect(lambda _: self.setAutoscale(1))
+        self.windowRange_text.textEdited.connect(self.setWindowRange)
         self.chnl1_button.clicked.connect(lambda _: self.toggleChannels())
         self.chnl2_button.clicked.connect(lambda _: self.toggleChannels())
         self.chnl3_button.clicked.connect(lambda _: self.toggleChannels())
         self.chnl4_button.clicked.connect(lambda _: self.toggleChannels())
-        self.channel_buttons = { 1:self.chnl1_button, # put all chnl buttons in a dict table for easier looping and access
-                                 2:self.chnl2_button,
-                                 3:self.chnl3_button,
-                                 4:self.chnl4_button  }
         self.x_axis_ComboBox.activated.connect(lambda _: self.change_x_axis())
         self.scatter_chkbox.stateChanged.connect(lambda _: self.togglePlotStyle())
         self.line_chkbox.stateChanged.connect(lambda _: self.togglePlotStyle())
@@ -234,16 +254,14 @@ class Plotter(QWidget):
         self.grid_layout.setSpacing(8)
 
         # adding the widgets to the layout
-        #self.grid_layout.addWidget(CustomLineEdit("hwllo"),4,0,1,8)
-        #self.grid_layout.addWidget(self.YcomboBox, 0, 0, -1, 2)
-        #self.grid_layout.addWidget(self.XcomboBox, 0, 1, -1, 2)
+        # layout, 1st row
         self.grid_layout.addWidget(self.Ytext_QLabel, 0, 0, 1, 2)
         self.grid_layout.addWidget(self.Ytext, 0, 2, 1, 10)
         self.grid_layout.addWidget(self.Xtext_QLabel, 0, 12, 1, 2)
         self.grid_layout.addWidget(self.Xtext, 0, 14, 1, 10)
         self.grid_layout.addWidget(self.btn, 0, 24)
         self.grid_layout.addWidget(self.stop, 0, 25)
-
+        # layout, 2nd row
         self.grid_layout.addWidget(self.YLimits_QLabel, 1, 0, 1, 2)
         self.grid_layout.addWidget(self.Y_lower_text, 1, 2, 1, 5)
         self.grid_layout.addWidget(self.Y_upper_text, 1, 7, 1, 5)
@@ -251,7 +269,7 @@ class Plotter(QWidget):
         self.grid_layout.addWidget(self.x_axis_ComboBox, 1, 14, 1, 10)
         self.grid_layout.addWidget(self.clear, 1, 24)
         self.grid_layout.addWidget(self.save, 1, 25)
-
+        # layout, 3rd row
         self.grid_layout.addWidget(self.windowRange_QLabel, 2, 0, 1, 2)
         self.grid_layout.addWidget(self.windowRange_text, 2, 2, 1, 10)
         self.grid_layout.addWidget(self.XLimits_QLabel, 2, 0, 1, 2)
@@ -259,7 +277,7 @@ class Plotter(QWidget):
         self.grid_layout.addWidget(self.X_upper_text, 2, 7, 1, 5)
         self.grid_layout.addWidget(self.autoscale_Y, 2, 24) #
         self.grid_layout.addWidget(self.autoscale_X, 2, 25) #
-
+        # layout, 4th row
         self.grid_layout.addWidget(self.chnl1_button,3,0,1,6)
         self.grid_layout.addWidget(self.chnl2_button,3,6,1,6)
         self.grid_layout.addWidget(self.chnl3_button,3,12,1,6)
@@ -267,22 +285,9 @@ class Plotter(QWidget):
         self.grid_layout.addWidget(self.line_chkbox, 3, 24)
         self.grid_layout.addWidget(self.scatter_chkbox, 3, 25)
 
+        # initialize grid layout and plotwidget display
         self.vbox.addLayout(self.grid_layout)
         self.vbox.addWidget(self.plotWidget)
-
-        # plotting variables
-        self.subscription = None
-        self.currentlyPlotting = False
-        self.data = np.array([])
-        self.x_axis_data = np.array([])
-        self.current_time = None
-        self.traces = []
-        self.channels = [True, False, False, False] # default channel selection
-        self.x_axis_selection = 0 # indicates which channel {1,2,3,4} is x-axis. 0 indicates time.
-        self.legend = None
-        self.traceSegment = 1000 # each trace should only hold 1000 datapoints max
-        self.maxSegments = 20 # max number of traces allowed
-        # self.ptr = 0
 
         # application showing
         self.setLayout(self.vbox)
@@ -292,14 +297,24 @@ class Plotter(QWidget):
         self.setTitle()
         self.setXLabel()
         self.setYLabel()
-        self.plotWidget.setXRange(0,self.windowRange) # CHANGED_HERE : initial window from 0 to XRange.
+        self.plotWidget.setXRange(0,self.windowRange) #  : initial window from 0 to XRange.
         self.show()
 
-    def togglePlotStyle(self, line=None, scatter=None):
-        if (line == None and scatter == None): # if this was called through user checkbox, fetch values
-            line = self.line_chkbox.isChecked()
-            scatter = self.scatter_chkbox.isChecked()
-        if (self.currentlyPlotting):
+    # toggles whether to represent data by connected lines, scatterpoints (symbols), or both
+
+    def togglePlotStyle(self, hide_non_selected = False):
+        """togglePlotStyle
+        toggles whether to represent data by connected lines, scatterpoints (symbols), or both
+        :param hide_non_selected: if this parameter is True,
+                                    and if plotting is stopped but not cleared,
+                                    hide all user-deselected channels.
+        """
+        # first, retrieve checked status from the user buttons
+        line = self.line_chkbox.isChecked()
+        scatter = self.scatter_chkbox.isChecked()
+        # if plot elements exist and hide_non_selected is false, toggle as usual.
+        # this conditional is usually activated during live plotting.
+        if (len(self.traces) > 0 and hide_non_selected == False):
             for i in range(len(self.traces)):
                 if (scatter == True):
                     self.traces[i].setSymbol('o')
@@ -311,9 +326,36 @@ class Plotter(QWidget):
                     self.traces[i].setPen(colours[i])
                 elif (line == False):
                     self.traces[i].setPen(None)
+        # if plot elements exist and hide_non_selected is True,
+        # this conditional was activated when plotting has already stopped
+        # we need to toggle the display based on the saved states
+        # from self.previousChannels since self.channels would already be cleared.
+        elif (len(self.traces) > 0 and hide_non_selected):
+            trace_index = 0
+            for i in range(4):
+                if (self.previousChannels[i]):
+                    if (scatter):
+                        self.traces[trace_index].setSymbol('o' if self.channel_buttons[i+1].isChecked() else None)
+                        self.traces[trace_index].setSymbolBrush(colours[trace_index] if self.channel_buttons[i+1].isChecked() else None)
+                    if (line):
+                        self.traces[trace_index].setPen(colours[trace_index] if self.channel_buttons[i+1].isChecked() else None)
+                    trace_index += 1 # move on to next trace in self.trace
 
     def change_x_axis(self):
-        self.x_axis_selection = self.x_axis_ComboBox.currentIndex()
+        """change_x_axis
+        changes the x_axis selection. the selection will be fetched from
+        the gui combobox in self.x_axis_Combobox, and subsequently
+        stored in self.x_axis_selection as an integer. Below are the integer
+        representations of all possible selections. They are selected to be the 
+        same as their indices in the GUI combobox.
+        0: Time
+        1: Channel 1
+        2: Channel 2
+        3: Channel 3
+        4: Channel 4
+        """
+        self.x_axis_selection = self.x_axis_ComboBox.currentIndex() # fetch from GUI
+        # if x-axis was not previously in time-plotting mode, set defaults accordingly
         if (self.x_axis_selection != 0):
             self.autoscale_X.setChecked(True)
             self.autoscale_Y.setChecked(True)
@@ -332,25 +374,37 @@ class Plotter(QWidget):
             self.X_upper_text.setVisible(False)
             self.windowRange_QLabel.setVisible(True)
             self.windowRange_text.setVisible(True)
+        # if x-axis channel selection was toggled while plotter was plotting
+        # restart the plot
         if (self.currentlyPlotting):
             self.stopData()
             self.clearData()
             self.toggleChannels()
             self.plotData()
+        # else, simply make a call to toggleChannels to set channels appriopriately
         else:
             self.toggleChannels()
 
     def toggleChannels(self):
+        """toggleChannels
+        this function toggles the channels being plotted. if plotting is currently ongoing
+        it is equivalent to stopping, reseting, and then restarting the plot with the selected channels
+        if plotting is stopped but not reset, it simply hides or displays the existing plots
+        if no plots are on display and plotting is stopped, it only edits self.channels for the next
+        time that the plot is started
+        """
         # if user is trying to plot channel against itself, block the attempt.
         if (self.x_axis_selection != 0 and self.channel_buttons[self.x_axis_selection].isChecked()):
             self.channel_buttons[self.x_axis_selection].setChecked(False)
             if (self.channels[self.x_axis_selection - 1] == False): # if it was already plotting normally before, just return
                 return                                              # otherwise, proceed and reset the plot to stop
                                                                     # channel from being plotted against itself.
+        # proceed to fetch button selection status from GUI
         self.channels = [self.chnl1_button.isChecked(),
                          self.chnl2_button.isChecked(),
                          self.chnl3_button.isChecked(),
                          self.chnl4_button.isChecked()]
+        # if function was called while live plotting was ongoing, reset the plot
         if (self.currentlyPlotting):
             self.stopData()
             self.clearData()
@@ -358,9 +412,20 @@ class Plotter(QWidget):
                 self.plotData()
             else:
                 self.messageBox("No channels selected. Plotting has been stopped.")
+        # when plot is stopped but there are previous graphs, we just toggle visibility of previous graphs
+        # by calling self.togglePlotStyle() programatically with hide_non_selected as True.
+        elif (self.previousChannels != None and len(self.traces) > 0):
+            self.togglePlotStyle(hide_non_selected = True)
 
-    def setYRange(self): #CHANGED_HERE
+    def setYRange(self):
+        """setYRange
+        changes the display range of y-axis
+        """
         try:
+            # fetches data from GUI elements and checks if they are valid values
+            # note that we don't check for if self.Y_lower > self.Y_upper.
+            # this is already handled by the pyqt library, so we just pass the values
+            # on.
             self.Y_lower = float(self.Y_lower_text.text())
             self.Y_upper = float(self.Y_upper_text.text())
             self.plotWidget.setYRange(self.Y_lower, self.Y_upper)
@@ -370,7 +435,11 @@ class Plotter(QWidget):
             self.Y_lower = None
             self.Y_upper = None
 
-    def setXRange(self): #CHANGED_HERE
+    def setXRange(self):
+        """setXRange
+        changes the display range of x-axis. only applicable in
+        multichannel vs channel plotting mode
+        """
         try:
             self.X_lower = float(self.X_lower_text.text())
             self.X_upper = float(self.X_upper_text.text())
@@ -378,20 +447,30 @@ class Plotter(QWidget):
             self.plotWidget.enableAutoRange(axis=0, enable=False)
             self.autoscale_X.setChecked(False)
         except:
-            self.Y_lower = None
-            self.Y_upper = None
+            self.X_lower = None
+            self.X_upper = None
 
 
-    def setWindowRange(self): ## CHANGED_HERE : function to connect to GUI. allows user to change window size
+    def setWindowRange(self):
+        """setWindowRange
+        changes the x-axis window size to display, only applicable
+        in time-plotting mode
+        """
         try:
-            self.windowRange = float(self.windowRange_text.text()) # CHANGED_HERE: retrieves value from user box. TODO: proof against invalid values eg. letters
+            self.windowRange = float(self.windowRange_text.text()) # : retrieves value from user box. TODO: proof against invalid values eg. letters
             print("Setting window range to " + str(self.windowRange))
             self.plotWidget.setXRange(0, self.windowRange)
             #self.X_autoscale = False
         except:
             pass
 
-    def setAutoscale(self, axis=None): #CHANGED_HERE
+    def setAutoscale(self, axis=None):
+        """setAutoscale
+        toggles autoscaling for axes
+        :param axis: optional integer (0 or 1) to select which axis to toggleAutoscale
+        0 : x-axis
+        1 : y-axis
+        """
         if (axis == 0 or axis == 1): # if axis is specified, change only for that
             if (axis == 0):
                 enable = self.autoscale_X.isChecked()
@@ -536,15 +615,15 @@ class Plotter(QWidget):
             for i in range(4):
                 if (self.channels[i]):
                     plot = self.plotWidget.plot(
-                        x=self.x_axis_data,
-                        y=self.data[index],
-                        pen= colours[index] if self.line_chkbox.isChecked() else None,
-                        symbol='o' if self.scatter_chkbox.isChecked() else None,
-                        symbolBrush= colours[index] if self.scatter_chkbox.isChecked() else None,
-                        symbolSize=5,
-                        name=channel_names[i])  # name=i
+                        x=self.x_axis_data, # underlying numpy x-axis data
+                        y=self.data[index], # underlying numpy y-axis
+                        pen= colours[index] if self.line_chkbox.isChecked() else None, # line display, if selected by user
+                        symbol='o' if self.scatter_chkbox.isChecked() else None, # scatter display, if selected by user
+                        symbolBrush= colours[index] if self.scatter_chkbox.isChecked() else None, # scatter display, if selected by user
+                        symbolSize=5, # scatter display size
+                        name=channel_names[i])  # fetch channel names from global dict table 
                     index += 1
-                    self.traces.append(plot)
+                    self.traces.append(plot) # consolidate all created PlotDataItems in self.traces
         # The traces already exist. Add the new data to each of the already
         # existing traces
         else:
@@ -555,36 +634,44 @@ class Plotter(QWidget):
                         or self.current_time < self.windowRange # or if plotting against time and it still fits witin window
                         or self.autoscale_X.isChecked()):  # or if autoscaling is on
                     self.traces[i].setPos(0,0)           # set position of plot to 0
-                else : # CHANGED_HERE. else, we just clip the plotItem accordingly
-                    self.traces[i].setPos(-self.current_time+self.windowRange,0) # CHANGED_HERE setPos of each plotItem
+                else : # . else, we just clip the plotItem accordingly
+                    self.traces[i].setPos(-self.current_time+self.windowRange,0) #  setPos of each plotItem
             # this is necessary for data smoothly being added/removed from plot
             QtGui.QApplication.processEvents()
 
     def stopData(self):
         """stopData
         Stops data collection in general.
-        The data arrays are still filled
+        The data arrays are still filled,
+        and the plotting variables are still
+        not yet reset.
         """
 
         # a boolean for keeping track if we are currently plotting
         # we set it false as we are stopping plotting
         self.currentlyPlotting = False
 
-        # if there is not a subscription, data wasn't being plotted anyways
+        # if subscription does not exist, data wasn't being plotted in the first place
+        # returns
         if not self.subscription:
             self.messageBox("No data is being plotted")
+            return
         # there is a subscription that we mean to stop.
         # The subscription is destroyed and we tell the backend to stop
         # plotting by using the toggleListening(on=boolean) function
         else:
-            self.subscription.dispose()
+            # keep a deep copy of the channel selection state so
+            # that the program can continue to make changes to display if needed
+            self.previousChannels = deepcopy(self.channels)
+            self.subscription.dispose() # remove subscription
             self.subscription = None
-            self.data_rpc.toggleListening(on=self.currentlyPlotting)
+            self.data_rpc.toggleListening(on=False)
             QtGui.QApplication.processEvents()
 
     def clearData(self):
         """clearData
-        Clears the plot of all traces
+        Clears the plot of all traces, and
+        resets all relevant plotting variables
         """
         # If there is a subscription, plotting hasn't been stopped
         # remind the user to stop plotting before trying to clear
@@ -609,7 +696,7 @@ class Plotter(QWidget):
 
     def saveData(self):
         """saveData
-        Saves the data in csv format
+        Saves the data in .csv format and/or .PNG image format
         """
         #self.exportToCSV()
         if not self.currentlyPlotting and self.data.size != 0:
@@ -621,39 +708,28 @@ class Plotter(QWidget):
             # first, prompt user if they want to save as .csv
             (filename,ok)=QInputDialog.getText(self,"Data Export to CSV","Filename (without .csv):                  ",
                                                 QLineEdit.Normal,defaultnameCSV)
-            if (not ok): # if user clicked cancel, stop saving
-                return
-            filename += '.csv'
-            exporter = pg_e.CSVExporter(self.plotWidget.plotItem)
-            exporter.export(fileName=filename)
-            self.messageBox('Data saved to ' + filename)
+            if (ok): # if user clicked okay, start saving .csv. else pass
+                filename += '.csv' # append correct file format
+                exporter = pg_e.CSVExporter(self.plotWidget.plotItem)
+                exporter.export(fileName=filename)
+                self.messageBox('Data saved to ' + filename)
 
             # then, prompt user if they want to save as .png
             (filename,ok)=QInputDialog.getText(self,"Image Export to PNG","Filename (without .png):                  ",
                                                 QLineEdit.Normal,defaultnamePNG)
-            if (not ok): # if user clicked cancel, stop saving
-                return
-            filename += '.png'
-            exporter = pg_e.ImageExporter(self.plotWidget.plotItem)
-            # these following two lines circumvent the bug in pyqt library.
-            # once the pyqt authors have fixed it in future updates, they shouldn't
-            # be needed.
-            exporter.params.param('width').setValue(1920, blockSignal=exporter.widthChanged)
-            exporter.params.param('height').setValue(1080, blockSignal=exporter.heightChanged)
-            exporter.export(fileName=filename)
-            self.messageBox('Data saved to ' + filename)
+            if (ok): # if user clicked okay on second popup, save as png. else pass.
+                filename += '.png'
+                exporter = pg_e.ImageExporter(self.plotWidget.plotItem)
+                # these following two lines circumvent the bug in pyqt library.
+                # once the pyqt authors have fixed it in future updates, they shouldn't
+                # be needed.
+                exporter.params.param('width').setValue(1920, blockSignal=exporter.widthChanged)
+                exporter.params.param('height').setValue(1080, blockSignal=exporter.heightChanged)
+                exporter.export(fileName=filename)
+                self.messageBox('Data saved to ' + filename)
         else:
             self.messageBox(
                 "Make sure you aren't plotting, or there is no data")
-
-    # def exportToCSV(self):
-    #     print(self.data.shape)
-    #     num_channels, n = self.data.shape
-
-    #     # data_csv = ""
-    #     print(self.data[0])
-    #     for i in range(n):
-    #         pass
 
 
 ###############################################################################
