@@ -51,10 +51,11 @@ class Plotter(QWidget):
                                     background-color: {2};
                                     color: {3};
                                    }}
-                                   """.format(
-                mapping[widget].__name__, kwargs.get('name', widget),
-                kwargs.get('backColor', 'transparent'),
-                kwargs.get('color', 'black')))
+                                   """.format(mapping[widget].__name__,
+                                              kwargs.get('name', widget),
+                                              kwargs.get(
+                                                  'backColor', 'transparent'),
+                                              kwargs.get('color', 'black')))
             return instance
 
     def messageBox(self, message):
@@ -95,21 +96,31 @@ class Plotter(QWidget):
             color='orange')
 
         self.windowRange = 30.  #### CHANGED_HERE default window of 10
-        self.Y_lower = None # CHANGED_HERE user-set y-axis lower limit
-        self.Y_upper = None # CHANGED_HERE user-set y-axis upper limit
-        self.X_autoscale = False # CHANGED_HERE boolean to switch on and off Y-autoscaling
-        self.plotSegments = 100 # CHANGED_HERE segment the plot into smaller plotItems for memory management
-        self.maxSegments = 20 # CHANGED_HERE only allow this number of 
-                              # segments on the plot at a time. After this, 
-                              # start deleting segments in FIFO order.
+        self.Y_lower = None  # CHANGED_HERE user-set y-axis lower limit
+        self.Y_upper = None  # CHANGED_HERE user-set y-axis upper limit
+        self.X_autoscale = False  # CHANGED_HERE boolean to switch on and off Y-autoscaling
+        self.plotSegments = 100  # CHANGED_HERE segment the plot into smaller plotItems for memory management
+        self.maxSegments = 20  # CHANGED_HERE only allow this number of
+        # segments on the plot at a time. After this,
+        # start deleting segments in FIFO order.
 
         self.Xtext = QLineEdit("Label for x-axis", self)
         self.Ytext = QLineEdit("Label for y-axis", self)
-        self.Y_lower_text = QLineEdit("Lower Limit for y-axis", self) # CHANGED_HERE QLine for lower limit of Y-axis
-        self.Y_upper_text = QLineEdit("Upper Limit for y-axis", self) # CHANGED_HERE QLine for upper limit of Y-axis
-        self.windowRange_text = QLineEdit("Window Range (default: " + str(self.windowRange) + ")", self) # CHANGED_HERE QLine for window range. allow dude to change window size from gui. TODO: fit it nicely somewhere into gui.
-        self.autoscale_Y = QPushButton("AutoY", self) # CHANGED_HERE turn on and off autoscaling of Y axis
-        self.autoscale_X = QPushButton("AutoX", self) # CHANGED_HERE turn on and off autoscaling of X axis
+        self.Y_lower_text = QLineEdit(
+            "Lower Limit for y-axis",
+            self)  # CHANGED_HERE QLine for lower limit of Y-axis
+        self.Y_upper_text = QLineEdit(
+            "Upper Limit for y-axis",
+            self)  # CHANGED_HERE QLine for upper limit of Y-axis
+        self.windowRange_text = QLineEdit(
+            "Window Range (default: " + str(self.windowRange) + ")", self
+        )  # CHANGED_HERE QLine for window range. allow dude to change window size from gui. TODO: fit it nicely somewhere into gui.
+        self.autoscale_Y = QPushButton(
+            "AutoY",
+            self)  # CHANGED_HERE turn on and off autoscaling of Y axis
+        self.autoscale_X = QPushButton(
+            "AutoX",
+            self)  # CHANGED_HERE turn on and off autoscaling of X axis
 
         # combobox init: For choosing the channels
         self.YcomboBox = QComboBox(self)
@@ -131,11 +142,17 @@ class Plotter(QWidget):
         self.Ytext.textEdited.connect(self.setTitle)
         self.Xtext.textEdited.connect(self.setXLabel)
         self.Ytext.textEdited.connect(self.setYLabel)
-        self.Y_lower_text.textEdited.connect(self.setYRange) # CHANGED_HERE
-        self.Y_upper_text.textEdited.connect(self.setYRange) # CHANGED_HERE
-        self.autoscale_X.clicked.connect(lambda _: self.setAutoscale(0)) # CHANGED_HERE, TODO should we change this to a toggle?
-        self.autoscale_Y.clicked.connect(lambda _: self.setAutoscale(1)) # CHANGED_HERE, TODO should we change this to a toggle?
-        self.windowRange_text.textEdited.connect(self.setWindowRange) # CHANGED_HERE connects Qline to function call
+        self.Y_lower_text.textEdited.connect(self.setYRange)  # CHANGED_HERE
+        self.Y_upper_text.textEdited.connect(self.setYRange)  # CHANGED_HERE
+        self.autoscale_X.clicked.connect(
+            lambda _: self.setAutoscale(0)
+        )  # CHANGED_HERE, TODO should we change this to a toggle?
+        self.autoscale_Y.clicked.connect(
+            lambda _: self.setAutoscale(1)
+        )  # CHANGED_HERE, TODO should we change this to a toggle?
+        self.windowRange_text.textEdited.connect(
+            self.setWindowRange
+        )  # CHANGED_HERE connects Qline to function call
 
         # pyqt graph init
         self.plotWidget = pg.PlotWidget()
@@ -154,11 +171,13 @@ class Plotter(QWidget):
         self.grid_layout.addWidget(self.Xtext, 1, 1)
         self.grid_layout.addWidget(self.clear, 1, 2)
         self.grid_layout.addWidget(self.save, 1, 3)
-        self.grid_layout.addWidget(self.Y_lower_text, 2, 0) #
-        self.grid_layout.addWidget(self.Y_upper_text, 2, 1) #
-        self.grid_layout.addWidget(self.windowRange_text, 3, 0) # put it somewhere proper. temporary position
-        self.grid_layout.addWidget(self.autoscale_Y, 2, 2) #
-        self.grid_layout.addWidget(self.autoscale_X, 2, 3) #
+        self.grid_layout.addWidget(self.Y_lower_text, 2, 0)  #
+        self.grid_layout.addWidget(self.Y_upper_text, 2, 1)  #
+        self.grid_layout.addWidget(
+            self.windowRange_text, 3,
+            0)  # put it somewhere proper. temporary position
+        self.grid_layout.addWidget(self.autoscale_Y, 2, 2)  #
+        self.grid_layout.addWidget(self.autoscale_X, 2, 3)  #
 
         self.vbox.addLayout(self.grid_layout)
         self.vbox.addWidget(self.plotWidget)
@@ -180,10 +199,12 @@ class Plotter(QWidget):
         self.setTitle()
         self.setXLabel()
         self.setYLabel()
-        self.plotWidget.setXRange(0,self.windowRange) # CHANGED_HERE : initial window from 0 to XRange.
+        self.plotWidget.setXRange(
+            0, self.windowRange
+        )  # CHANGED_HERE : initial window from 0 to XRange.
         self.show()
 
-    def setYRange(self): #CHANGED_HERE
+    def setYRange(self):  #CHANGED_HERE
         try:
             self.Y_lower = float(self.Y_lower_text.text())
             self.Y_upper = float(self.Y_upper_text.text())
@@ -192,19 +213,22 @@ class Plotter(QWidget):
             self.Y_lower = None
             self.Y_upper = None
 
-    def setWindowRange(self): ## CHANGED_HERE : function to connect to GUI. allows user to change window size
+    def setWindowRange(
+            self
+    ):  ## CHANGED_HERE : function to connect to GUI. allows user to change window size
         try:
-            self.windowRange = float(self.windowRange_text.text()) # CHANGED_HERE: retrieves value from user box. TODO: proof against invalid values eg. letters
+            self.windowRange = float(
+                self.windowRange_text.text()
+            )  # CHANGED_HERE: retrieves value from user box. TODO: proof against invalid values eg. letters
             print("Setting window range to " + str(self.windowRange))
             self.plotWidget.setXRange(0, self.windowRange)
             self.X_autoscale = False
         except:
             pass
 
-    def setAutoscale(self, axis): #CHANGED_HERE
+    def setAutoscale(self, axis):  #CHANGED_HERE
         self.plotWidget.enableAutoRange(axis=axis)
-        self.X_autoscale = True if axis==0 else self.X_autoscale
-
+        self.X_autoscale = True if axis == 0 else self.X_autoscale
 
     def initComboBox(self, box):
         """initComboBox
@@ -289,14 +313,14 @@ class Plotter(QWidget):
         # if we have not yet subscribed to the observer, or if we stopped
         # subscribing to the observer, subscribe to it
         if not self.subscription:
-            # depending on the current rx version, try different versions 
+            # depending on the current rx version, try different versions
             # of subscribe since the older versions use subscribe_()
             try:
-                self.subscription = self.observer.subscribe_(lambda x: self.
-                                                            addData(x))
+                self.subscription = self.observer.subscribe_(
+                    lambda x: self.addData(x))
             except:
-                self.subscription = self.observer.subscribe(lambda x: self.
-                                                            addData(x))
+                self.subscription = self.observer.subscribe(
+                    lambda x: self.addData(x))
         # this is the function that starts the data collection in the backend
         # the on variable starts and stops data observation in the backend
         # prod=boolean is a variable that sets whether we retrieve test/actual
@@ -312,6 +336,7 @@ class Plotter(QWidget):
         data_period = newData.pop()
         # refactor the new incoming data
         fixedNewData = np.array([i for i in newData])
+        # print(self.data)
         # if we are at the start of plotting
         if self.data.size == 0:
             self.data = np.zeros_like(fixedNewData)
@@ -324,11 +349,12 @@ class Plotter(QWidget):
         else:
             # self.ptr += 1
             self.data = np.concatenate((self.data, fixedNewData), axis=1)
-            self.timeline = np.concatenate((self.timeline, 
-                                            np.linspace(self.current_time,
-                                                        self.current_time + data_period,
-                                                        fixedNewData.shape[1])))
-            self.current_time += data_period # update time position of next incoming data
+            self.timeline = np.concatenate(
+                (self.timeline,
+                 np.linspace(self.current_time,
+                             self.current_time + data_period,
+                             fixedNewData.shape[1])))
+            self.current_time += data_period  # update time position of next incoming data
             # there is already data
             starting = False
         # Since we are just starting, we create new traces for each channel
@@ -338,19 +364,23 @@ class Plotter(QWidget):
                 plot = self.plotWidget.plot(
                     x=self.timeline,
                     y=self.data[i],
-                    pen=(i + i*4, self.data.size),
+                    pen=(i + i * 4, self.data.size),
                     name=str(i))  # name=i
                 self.traces.append(plot)
         # The traces already exist. Add the new data to each of the already
         # existing traces
         else:
             for i in range(len(self.data)):
-                self.traces[i].setData(x=self.timeline,
-                                       y=self.data[i])
-                if (self.current_time < self.windowRange or self.X_autoscale): #CHANGED_HERE: aligns plotItem to left if it still fits within window
-                    self.traces[i].setPos(0,0) 
-                else : # CHANGED_HERE. else, we just clip the plotItem accordingly
-                    self.traces[i].setPos(-self.current_time+self.windowRange,0) # CHANGED_HERE setPos of each plotItem
+                self.traces[i].setData(x=self.timeline, y=self.data[i])
+                if (
+                        self.current_time < self.windowRange
+                        or self.X_autoscale
+                ):  #CHANGED_HERE: aligns plotItem to left if it still fits within window
+                    self.traces[i].setPos(0, 0)
+                else:  # CHANGED_HERE. else, we just clip the plotItem accordingly
+                    self.traces[i].setPos(
+                        -self.current_time + self.windowRange,
+                        0)  # CHANGED_HERE setPos of each plotItem
             # this is necessary for data smoothly being added/removed from plot
             QtGui.QApplication.processEvents()
 

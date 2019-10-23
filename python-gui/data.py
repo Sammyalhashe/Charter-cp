@@ -1,14 +1,16 @@
 ###############################################################################
-from random import random
-from rx.subjects import Subject
+from random import random, randint
+from rx.subject import Subject
 import nidaqmx as nida
 import time
-from math import sin, cos
+from math import sin, cos, pi
 import numpy as np
+from serial_ard import read_ard
 
 ###############################################################################
 
 daq_chnl_names = ["Dev1/ai0", "Dev1/ai1", "Dev1/ai2", "Dev1/ai3"]
+
 
 class dataRPC():
     """dataRPC"""
@@ -37,6 +39,15 @@ class dataRPC():
         if not self.stream:
             self.stream = Subject()
 
+    def fourier_example(self, x, A, w, p, num=1):
+        funcs = [sin, cos]
+        total = 0
+        for i in range(num):
+            rand_amp = A * random()
+            func_i = randint(0, 1)
+            total += rand_amp * funcs[func_i](w * x + p)
+        return total
+
     def getData_s(self, channels, x_axis, time_sim=True):
         """getData_s
         This function is a test function that mimics observing the data
@@ -47,14 +58,33 @@ class dataRPC():
         n = 1
         if not self.stream:
             self.activateStream()
-        stream_arr = [[sin(4 * (time.time()+i))] * n for i in range(sum(channels))]
+        stream_arr = [[
+            # sin(4 * (time.time() + i)) * n for i in range(sum(channels))
+            self.fourier_example(time.time() + i, 4 / (3 * pi), 3 * pi / 4, 0)
+            if i != 0 else read_ard() for i in range(sum(channels))
+            # read_ard() for i in range(sum(channels))
+        ]]
         if (x_axis != 0):
             stream_arr.append(cos(4 * (time.time())))
         elif (time_sim):
             stream_arr.append(time.time())
+
+        end = time.time()
+        # append time period of the data readings to stream_arr
+        # if (x_axis == 0):
+        #     if sum(channels) == 1:
+        #         stream_arr = [stream_arr]
+        #     stream_arr.append(end)
+        # else:
+        #     stream_arr[len(stream_arr) - 1] = stream_arr[len(stream_arr)
+        #                                                  - 1][0]
         self.stream.on_next(stream_arr)
 
-    def getData_test(self, on=False, prod=False, channels=[True,True,True,True], x_axis=0):
+    def getData_test(self,
+                     on=False,
+                     prod=False,
+                     channels=[True, False, False, False],
+                     x_axis=0):
         """getData_test
         Function that starts the test data observation
 
@@ -68,9 +98,9 @@ class dataRPC():
         self.plottingOn = on
         while self.plottingOn:
             if not prod:
-                self.getData_s(channels,x_axis=x_axis)
+                self.getData_s(channels, x_axis=x_axis)
             else:
-                self.getData_larrybox(channels,x_axis=x_axis)
+                self.getData_larrybox(channels, x_axis=x_axis)
             # time.sleep(0.25)
 
     def getData_larrybox(self, channels, x_axis, sampling_rate=10000):
@@ -90,25 +120,30 @@ class dataRPC():
                     if (channels[i] and x_axis != i + 1):
                         task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
                 if (x_axis != 0):
-                    task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
-                stream_arr = task.read(1) # read one sample from each channel at a time
+                    task.ai_channels.add_ai_voltage_chan(
+                        daq_chnl_names[x_axis - 1])
+                stream_arr = task.read(
+                    1)  # read one sample from each channel at a time
             except:
                 task.stop()
                 for i in range(4):
                     if (channels[i] and x_axis != i + 1):
                         task.ai_channels.add_ai_voltage_chan(daq_chnl_names[i])
                 if (x_axis != 0):
-                    task.ai_channels.add_ai_voltage_chan(daq_chnl_names[x_axis - 1])
-                stream_arr = task.read(1) # read one sample from each channel at a time
+                    task.ai_channels.add_ai_voltage_chan(
+                        daq_chnl_names[x_axis - 1])
+                stream_arr = task.read(
+                    1)  # read one sample from each channel at a time
             end = time.time()
 
             # append time period of the data readings to stream_arr
             if (x_axis == 0):
-                if sum(channels)==1:
+                if sum(channels) == 1:
                     stream_arr = [stream_arr]
                 stream_arr.append(end)
             else:
-                stream_arr[len(stream_arr)-1] = stream_arr[len(stream_arr)-1][0]
+                stream_arr[len(stream_arr) - 1] = stream_arr[len(stream_arr)
+                                                             - 1][0]
 
             self.stream.on_next(stream_arr)
 
