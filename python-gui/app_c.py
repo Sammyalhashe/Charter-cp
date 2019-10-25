@@ -13,6 +13,7 @@ from data import dataRPC
 import time
 import datetime
 from copy import deepcopy
+from serial_ard import query_serial_ports
 
 ###############################################################################
 
@@ -40,6 +41,77 @@ colours = {0: 'c', 1: 'w', 2: 'g', 3: 'm', 4: 'r'}
 # another non-intrusive way is to override the default params, which is done in saveData below.
 # second method is however just a workaround until pyqt gets their shit together.
 ##############################################################################################
+
+
+class CustomPopup(QWidget):
+    def __init__(self, parent):
+        QWidget.__init__(self)
+        self.parent = parent
+        self.ports = Plotter.configurePorts()
+        self.selectedPorts = self.parent.data_rpc.portNames
+        self.init_UI()
+
+    def selectionChanged(self, i, idx):
+        if idx == 0:
+            self.selectedPorts[i] = None
+        else:
+            # ignore the "None" option
+            self.selectedPorts[i] = self.ports[idx - 1]
+        self.parent.setPorts(self.selectedPorts)
+
+    def init_UI(self):
+        # TODO add a refresh ports button
+        # creating GUI elements
+        self.ch1_textLabel = QLabel("Channel 1")  # text label
+        self.ch2_textLabel = QLabel("Channel 2")  # text label
+        self.ch3_textLabel = QLabel("Channel 3")  # text label
+        self.ch4_textLabel = QLabel("Channel 4")  # text label
+        # combo boxes to hold serial port options
+        self.ch2_combo = QComboBox()
+        self.ch1_combo = QComboBox()
+        self.ch3_combo = QComboBox()
+        self.ch4_combo = QComboBox()
+        # add the selection options
+        self.ch1_combo.addItem("None")
+        self.ch2_combo.addItem("None")
+        self.ch3_combo.addItem("None")
+        self.ch4_combo.addItem("None")
+
+        self.ch1_combo.addItems(self.ports)
+        self.ch2_combo.addItems(self.ports)
+        self.ch3_combo.addItems(self.ports)
+        self.ch4_combo.addItems(self.ports)
+
+        # add change callbacks
+        self.ch1_combo.currentIndexChanged.connect(
+            lambda idx: self.selectionChanged(0, idx))
+        self.ch2_combo.currentIndexChanged.connect(
+            lambda idx: self.selectionChanged(1, idx))
+        self.ch3_combo.currentIndexChanged.connect(
+            lambda idx: self.selectionChanged(2, idx))
+        self.ch4_combo.currentIndexChanged.connect(
+            lambda idx: self.selectionChanged(3, idx))
+
+        # layout init
+        self.vbox = QVBoxLayout()
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(8)
+
+        # adding the widgets to the layout
+        # layout, 1st row
+        self.grid_layout.addWidget(self.ch1_textLabel, 0, 0, 1, 2)
+        self.grid_layout.addWidget(self.ch1_combo, 0, 2, 1, 10)
+        self.grid_layout.addWidget(self.ch2_textLabel, 1, 0, 1, 2)
+        self.grid_layout.addWidget(self.ch2_combo, 1, 2, 1, 10)
+        self.grid_layout.addWidget(self.ch3_textLabel, 2, 0, 1, 2)
+        self.grid_layout.addWidget(self.ch3_combo, 2, 2, 1, 10)
+        self.grid_layout.addWidget(self.ch4_textLabel, 3, 0, 1, 2)
+        self.grid_layout.addWidget(self.ch4_combo, 3, 2, 1, 10)
+        # initialize grid layout and plotwidget display
+        self.vbox.addLayout(self.grid_layout)
+
+        self.setLayout(self.vbox)
+        self.setWindowTitle("Configure Channel Input")
 
 
 class CustomLineEdit(QLineEdit):
@@ -81,6 +153,7 @@ class Plotter(QWidget):
         # application init
         super().__init__()
         self.data_rpc = dataRPC()
+        self.popup = CustomPopup(self)
         self.observer = None
         self.init_UI()
 
@@ -125,7 +198,7 @@ class Plotter(QWidget):
         """init_UI"""
         # common component init
         self.btn = QPushButton("Start", self)
-        self.stop = QPushButton("Stop", self)
+        self.stop = QPushButton("Configure", self)
         self.btn.setStyleSheet(
             'QPushButton {background-color: #A3C1DA; color: blue;}')
         self.stop.setStyleSheet(
@@ -241,8 +314,8 @@ class Plotter(QWidget):
 
         # functionality for all created GUI elements
         # connects all the buttons/labels to their associated functions
-        self.btn.clicked.connect(lambda _: self.plotData())
-        self.stop.clicked.connect(lambda _: self.stopData())
+        self.btn.clicked.connect(lambda _: self.StartClicked())
+        self.stop.clicked.connect(lambda _: self.ConfigurePorts())
         self.clear.clicked.connect(lambda _: self.clearData())
         self.save.clicked.connect(lambda _: self.saveData())
         self.Xtext.textEdited.connect(self.setTitle)
@@ -320,6 +393,12 @@ class Plotter(QWidget):
         self.plotWidget.setXRange(
             0, self.windowRange)  #  : initial window from 0 to XRange.
         self.show()
+
+    def StartClicked(self):
+        if not self.currentlyPlotting:
+            self.plotData()
+        else:
+            self.stopData()
 
     # toggles whether to represent data by connected lines, scatterpoints (symbols), or both
 
@@ -563,6 +642,30 @@ class Plotter(QWidget):
         """.format(styles['label'], ytext)
         self.plotWidget.setLabel('left', text=html)
 
+    def togglePlottingStatus(self):
+        if self.currentlyPlotting:
+            self.btn.setText("Stop")
+        else:
+            self.btn.setText("Start")
+
+    @staticmethod
+    def configurePorts():
+        ports = query_serial_ports()
+        return ports
+
+    def ConfigurePorts(self):
+        self.popup.setGeometry(QRect(100, 100, 400, 200))
+        self.popup.show()
+        # ports = Plotter.configurePorts()
+        # items = ports
+        # item, ok = QInputDialog.getItem(self, "Get item", "Color:", items, 0,
+        #                                 False)
+        # if ok and item:
+        #     print(item)
+
+    def setPorts(self, ports):
+        self.data_rpc.setPorts(ports)
+
     def getObserver(self):
         """
         getObserver
@@ -587,6 +690,7 @@ class Plotter(QWidget):
         if self.currentlyPlotting:
             self.messageBox("Already Plotting")
             return
+        # self.data_rpc.togglePortConnections()
         # If not plotting, but there is already data on the plot,
         # first clear, and then starting plotting again
         if self.data is not None and self.data.size != 0:
@@ -596,6 +700,7 @@ class Plotter(QWidget):
             self.legend = self.plotWidget.addLegend()
         # set that we are plotting
         self.currentlyPlotting = True
+        self.togglePlottingStatus()
         # if we have not yet grabbed the observer from the backend, get it
         if not self.observer:
             self.getObserver()
@@ -615,7 +720,11 @@ class Plotter(QWidget):
         # prod=boolean is a variable that sets whether we retrieve test/actual
         # values
         self.data_rpc.getData_test(
-            on=True, channels=self.channels, x_axis=self.x_axis_selection)
+            on=True,
+            prod=False,
+            larrybox=False,
+            channels=self.channels,
+            x_axis=self.x_axis_selection)
 
     def addData(self, newData):
         """addData
@@ -710,6 +819,7 @@ class Plotter(QWidget):
         # a boolean for keeping track if we are currently plotting
         # we set it false as we are stopping plotting
         self.currentlyPlotting = False
+        self.togglePlottingStatus()
 
         # if subscription does not exist, data wasn't being plotted in the first place
         # returns
@@ -802,8 +912,17 @@ class Plotter(QWidget):
 
 ###############################################################################
 
-if __name__ == '__main__':
+
+def app():
     app = QApplication(sys.argv)
     plotter = Plotter()
     # only exit when the exec_ function is called
     sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    app()
+# app = QApplication(sys.argv)
+# plotter = Plotter()
+# # only exit when the exec_ function is called
+# sys.exit(app.exec_())

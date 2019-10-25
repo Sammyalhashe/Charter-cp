@@ -5,7 +5,7 @@ import nidaqmx as nida
 import time
 from math import sin, cos, pi
 import numpy as np
-from serial_ard import read_ard
+from serial_ard import read_serial_connection, connectToSerialPort, close_serial_port_connection
 
 ###############################################################################
 
@@ -18,6 +18,26 @@ class dataRPC():
     def __init__(self):
         self.stream = None
         self.plottingOn = False
+        self.ports = [None, None, None, None]
+        self.portNames = [None, None, None, None]
+
+    def setPorts(self, ports):
+        self.portNames = ports
+        self.connectPorts()
+
+    def connectPorts(self):
+        self.ports = list(
+            map(lambda x: connectToSerialPort(x) if x else None,
+                self.portNames))
+
+    def close_all_port_connections(self):
+        for port in self.ports:
+            if port:
+                close_serial_port_connection(port)
+
+    def togglePortConnections(self):
+        self.close_all_port_connections()
+        self.connectPorts()
 
     def getStream(self):
         if not self.stream:
@@ -39,7 +59,7 @@ class dataRPC():
         if not self.stream:
             self.stream = Subject()
 
-    def fourier_example(self, x, A, w, p, num=1):
+    def fourier_example(self, x, A, w, p, num=100):
         funcs = [sin, cos]
         total = 0
         for i in range(num):
@@ -48,22 +68,34 @@ class dataRPC():
             total += rand_amp * funcs[func_i](w * x + p)
         return total
 
-    def getData_s(self, channels, x_axis, time_sim=True):
+    def getData_s(self,
+                  channels,
+                  x_axis,
+                  ports=[None, None, None, None],
+                  time_sim=True):
         """getData_s
         This function is a test function that mimics observing the data
         stream from the larry box.
 
         :param channels: list of booleans => which channels you want to observe
         """
-        n = 1
         if not self.stream:
             self.activateStream()
-        stream_arr = [[
-            # sin(4 * (time.time() + i)) * n for i in range(sum(channels))
-            self.fourier_example(time.time() + i, 4 / (3 * pi), 3 * pi / 4, 0)
-            if i != 0 else read_ard() for i in range(sum(channels))
-            # read_ard() for i in range(sum(channels))
-        ]]
+        # stream_arr = [[
+        # sin(4 * (time.time() + i)) * n for i in range(sum(channels))
+        #    self.fourier_example(time.time() + i, 4 / (3 * pi), 3 * pi / 4, 0) for i in range(sum(channels))
+        # ]]
+        inner = []
+        for i in range(len(channels)):
+            n = 1
+            if channels[i]:
+                if not ports[i]:
+                    inner.append(
+                        self.fourier_example(time.time() + i, 4 / (3 * pi),
+                                             3 * pi / 4, 0))
+                else:
+                    inner.append(read_serial_connection(ports[i]))
+        stream_arr = [inner]
         if (x_axis != 0):
             stream_arr.append(cos(4 * (time.time())))
         elif (time_sim):
@@ -83,8 +115,10 @@ class dataRPC():
     def getData_test(self,
                      on=False,
                      prod=False,
+                     larrybox=False,
                      channels=[True, False, False, False],
-                     x_axis=0):
+                     x_axis=0,
+                     ports=None):
         """getData_test
         Function that starts the test data observation
 
@@ -98,9 +132,13 @@ class dataRPC():
         self.plottingOn = on
         while self.plottingOn:
             if not prod:
-                self.getData_s(channels, x_axis=x_axis)
+                if not ports:
+                    self.getData_s(channels, x_axis=x_axis, ports=self.ports)
+                else:
+                    self.getData_s(channels, x_axis=x_axis, ports=ports)
             else:
-                self.getData_larrybox(channels, x_axis=x_axis)
+                if larrybox:
+                    self.getData_larrybox(channels, x_axis=x_axis)
             # time.sleep(0.25)
 
     def getData_larrybox(self, channels, x_axis, sampling_rate=10000):

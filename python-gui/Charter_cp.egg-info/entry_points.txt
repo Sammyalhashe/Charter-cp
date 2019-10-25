@@ -1,0 +1,4 @@
+
+        [console_scripts]
+        Charter-cp=app_c:app
+        
