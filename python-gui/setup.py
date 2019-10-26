@@ -12,10 +12,12 @@ setup(
         "PyQt5==5.13.1",
         "PyQt5-sip==12.7.0",
         "pyqtgraph==0.10.0",
+        "pyserial==3.4",
         "Rx==3.0.1",
         "six==1.12.0",
-        ],
+    ],
     entry_points="""
         [console_scripts]
         Charter-cp=app_c:app
-        """,)
+        """,
+)
