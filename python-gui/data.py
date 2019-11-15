@@ -11,6 +11,9 @@ from serial_ard import read_serial_connection, connectToSerialPort, close_serial
 
 daq_chnl_names = ["Dev1/ai0", "Dev1/ai1", "Dev1/ai2", "Dev1/ai3"]
 
+def lin(x):
+        return x
+
 
 class dataRPC():
     """dataRPC"""
@@ -59,7 +62,7 @@ class dataRPC():
         if not self.stream:
             self.stream = Subject()
 
-    def fourier_example(self, x, A, w, p, num=100):
+    def fourier_example(self, x, A, w, p, num=1000):
         funcs = [sin, cos]
         total = 0
         for i in range(num):
@@ -92,7 +95,7 @@ class dataRPC():
                 if not ports[i]:
                     inner.append(
                         self.fourier_example(time.time() + i, 4 / (3 * pi),
-                                             3 * pi / 4, 0))
+                                             3 * pi / 4, pi / 4 + i*pi/2))
                 else:
                     inner.append(read_serial_connection(ports[i]))
         stream_arr = [inner]

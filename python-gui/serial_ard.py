@@ -16,7 +16,7 @@ def query_serial_ports():
 def connectToSerialPort(port):
     # "/dev/cu.usbmodem141301"
     try:
-        ser = sl.Serial(port, 9600)
+        ser = sl.Serial(port, 9600, timeout=0)
         return ser
     except Exception as e:
         print(e)
@@ -31,10 +31,16 @@ def read_serial_connection(ser):
     # bval = ser.readline()
     if not ser.isOpen():
         ser.open()
-    val = ser.readline().decode("utf-8").replace(r"\r", "").replace(r"\n", "")
-    # print(val)
-    return float(val)
+    try:
+        val = ser.readline().decode("utf-8").replace(r"\r", "").replace(
+            r"\n", "").strip()
+        return float(val)
+    except ValueError:
+        return 0
 
 
 if __name__ == "__main__":
     print(query_serial_ports())
+    ser = connectToSerialPort('/dev/cu.Bluetooth-Incoming-Port')
+    while True:
+        print(read_serial_connection(ser))
