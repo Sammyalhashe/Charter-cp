@@ -33,6 +33,7 @@ channel_names = ["Channel 1", "Channel 2", "Channel 3", "Channel 4"]
 # permitted colours in pyqt for Qpen constructor is (b, g, r, c, m, y, k, w)
 colours = {0: 'c', 1: 'w', 2: 'g', 3: 'm', 4: 'r'}
 
+
 ##############################################################################################
 # There's a bug with the pyqtgraph library that interferes with image exports.
 # One workaround is to edit the library directly. Search for ImageExporter.py and
@@ -41,7 +42,6 @@ colours = {0: 'c', 1: 'w', 2: 'g', 3: 'm', 4: 'r'}
 # another non-intrusive way is to override the default params, which is done in saveData below.
 # second method is however just a workaround until pyqt gets their shit together.
 ##############################################################################################
-
 
 class CustomPopup(QWidget):
     def __init__(self, parent):
