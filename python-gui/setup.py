@@ -8,7 +8,7 @@ setup(
     py_modules=["app_c"],
     install_requires=[
         "nidaqmx==0.5.7",
-        "numpy==1.17.3",
+        "numpy==1.22.0",
         "PyQt5==5.13.1",
         "PyQt5-sip==12.7.0",
         "pyqtgraph==0.10.0",
