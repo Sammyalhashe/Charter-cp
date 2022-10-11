@@ -18,7 +18,7 @@
     "license": "CC0-1.0",
     "devDependencies": {
         "electron": "^4.0.4",
-        "electron-packager": "^9.0.1",
+        "electron-packager": "^16.0.0",
         "eslint": "^5.14.0"
     },
     "dependencies": {
